@@ -54,6 +54,8 @@ components:
     divider: '{colors.outline}'
   retention-row:
     corner: '{rounded.sm}'
+  master-schedule-list:
+    corner: '{rounded.sm}'
 ---
 
 ## Brand & Style
@@ -95,8 +97,9 @@ Material 3 default shape scale: `{rounded.sm}` for list rows and form fields, `{
 
 - **Compliance halt screen** — full-screen, `{colors.surface-variant}` background, no red, no warning-triangle iconography. Centered message text ("Not compliant — contact admin") in `{typography.title}`, a single line of `{typography.body}` explanatory text below it, nothing else on screen. No retry button, no dismiss action — see EXPERIENCE.md for why.
 - **Image grid item** (Image Library screen) — square thumbnail, `{rounded.sm}` corners, active/inactive toggle as a simple switch overlaid bottom-right. Inactive images are desaturated with a 60% opacity overlay — not hidden, not marked with a red icon, just visually "dimmed out."
-- **Receiver row** (Receivers screen) — `{rounded.md}` card: name + channel icon (WhatsApp/email) on top line, schedule summary (e.g. "4×/day") + count range as `{typography.label}` meta text below — a receiver has one or more schedule times (minimum 4), the row shows a count summary rather than the full list; the full list is visible/editable on the Receiver Edit screen. Tap opens edit; trailing icon-button for delete.
+- **Receiver row** (Receivers screen) — `{rounded.md}` card: name + channel icon (WhatsApp/email) on top line, schedule summary (e.g. "4×/day", or "Uses master schedule" if the receiver has none of its own) + count range as `{typography.label}` meta text below — the full list (if any) is visible/editable on the Receiver Edit screen. Tap opens edit; trailing icon-button for delete.
 - **Retention row** (Settings) — simple label-left/value-right row (current retention days), tap opens a numeric picker. No slider — a slider implies more granularity than this setting needs.
+- **Master schedule list** (Settings) — reuses the exact "Schedule time list" component from Receiver Edit (EXPERIENCE.md#Component Patterns) verbatim: same add/remove rows, same minimum-4 inline error, same time picker. Sits below the retention row on the same screen, its own labeled section ("Master schedule").
 - **Dashboard entry row** — timestamp in `{typography.label}`, image thumbnail (small, 40dp) leading, "Sent" in `{colors.success-muted}` trailing.
 
 ## Do's and Don'ts

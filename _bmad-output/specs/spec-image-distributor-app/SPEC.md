@@ -19,8 +19,8 @@ The operator (a friend of the requester) runs a business where 8-10 paying custo
   - **success:** An image flagged inactive is never selected for a future send; reactivating it makes it selectable again.
 
 - **CAP-2**
-  - **intent:** Operator can configure up to ~10 receivers, each with a name, +91 mobile number, a delivery channel (WhatsApp or email), a per-receiver minimum/maximum image count (drawn fresh at each send), and one or more daily send schedule times (minimum 4).
-  - **success:** Each receiver sends according to its own schedule times, channel, and count range — changing one receiver's settings does not affect another's.
+  - **intent:** Operator can configure up to ~10 receivers, each with a name, +91 mobile number, a delivery channel (WhatsApp or email), a per-receiver minimum/maximum image count (drawn fresh at each send), and *optionally* one or more daily send schedule times — if any are given, minimum 4. A receiver with no schedule of its own falls back to the app-wide master schedule (also minimum 4 times, configured once in Settings).
+  - **success:** Each receiver sends according to its own schedule times (or the master schedule, if it has none), channel, and count range — changing one receiver's settings never affects another's, and changing the master schedule only affects receivers that don't have their own.
 
 - **CAP-3**
   - **intent:** At each scheduled send, the system picks a random image count within that receiver's min/max, then selects that many active images for the receiver, avoiding any image already sent to that receiver in the last 7 days unless the eligible pool can't cover the count (see `mechanics.md`).
@@ -45,6 +45,10 @@ The operator (a friend of the requester) runs a business where 8-10 paying custo
 - **CAP-8**
   - **intent:** Transmission history older than a configurable retention period (default 30 days) is purged from the database.
   - **success:** Records older than the configured window are removed; changing the configured window changes what gets purged going forward.
+
+- **CAP-9**
+  - **intent:** Operator can configure one app-wide default ("master") schedule of daily send times (minimum 4) in Settings, used by any receiver that has no schedule of its own.
+  - **success:** A receiver with no per-receiver schedule sends at the master schedule's times; changing the master schedule immediately changes future sends for every receiver still using it, but never touches receivers that have their own schedule.
 
 ## Constraints
 

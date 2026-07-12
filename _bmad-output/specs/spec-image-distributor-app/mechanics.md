@@ -41,6 +41,13 @@ For each receiver, at each scheduled send:
 - If the tablet reconnects after an outage, only the current day's scheduled batch is resumed from the queue. Batches from earlier missed days are not backfilled — the operator is expected to have covered those manually.
 - An image already selected and queued is still sent even if it is flagged inactive before the queue actually fires. "Inactive" only removes an image from future selection (step 2-3 of the selection algorithm above), it does not cancel an already-queued send.
 
+## Master schedule and fallback (CAP-9)
+
+- A receiver's own schedule (`ReceiverSchedule` rows) is optional. If a receiver has zero schedule times of its own, every scheduled-send check for that receiver uses the master schedule instead — evaluated fresh each time, not copied onto the receiver.
+- The master schedule is a single, app-wide list of times (minimum 4), configured once in Settings — the same "minimum 4" rule as a per-receiver schedule, enforced the same way (at save time, not at the schema level).
+- A receiver with its own schedule never consults the master schedule, even partially — it's all-or-nothing per receiver, not a merge of the two lists.
+- Changing the master schedule takes effect on the next scheduled-send check, for every receiver currently relying on it — same "takes effect from the next scheduled send onward" rule Story 1.3 already established for per-receiver schedule edits.
+
 ## Failure-mode table
 
 | Scenario | Behavior |
@@ -51,4 +58,5 @@ For each receiver, at each scheduled send:
 | Active image pool smaller than the chosen count Z | Send only the available active images; no duplicates, no topping up |
 | 7-day no-repeat pool exhausted (not enough unsent-in-7-days images to reach Z) | Allow repeats as a fallback, still capped at the active image count |
 | Image flagged inactive after being selected/queued but before the queue fires | Still sent as queued; inactive only blocks future selection |
+| Receiver has no schedule of its own | Use the master schedule's times for that receiver's scheduled-send checks |
 | Transmission to a receiver fails (any reason) | Retry up to 3 times; receiver's number correctness is the operator's own responsibility |

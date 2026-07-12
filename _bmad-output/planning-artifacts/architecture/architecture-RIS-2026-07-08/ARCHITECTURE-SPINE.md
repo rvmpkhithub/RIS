@@ -103,7 +103,7 @@ graph TD
 ### AD-12 — Single periodic scanning Worker
 - **Binds:** CAP-3, CAP-4
 - **Prevents:** one WorkManager periodic request per receiver, which multiplies work requests unnecessarily and fights WorkManager's inexact timing/Doze batching
-- **Rule:** One periodic `SendWorker` runs on a short fixed interval (e.g. every 15 minutes). Each run checks every receiver's scheduled times (a receiver has one or more, minimum 4 — `ReceiverSchedule` rows) against the current time and dispatches a send for any schedule slot that is due and has not already been sent for that slot today. No per-receiver WorkManager requests exist.
+- **Rule:** One periodic `SendWorker` runs on a short fixed interval (e.g. every 15 minutes). Each run checks every receiver's scheduled times — its own `ReceiverSchedule` rows if it has any (minimum 4), otherwise `MasterSchedule`'s rows (AD-16) — against the current time, and dispatches a send for any schedule slot that is due and has not already been sent for that slot today. No per-receiver WorkManager requests exist.
 
 ### AD-13 — Transmission: one row per send, updated in place
 - **Binds:** CAP-4, CAP-5
@@ -120,12 +120,17 @@ graph TD
 - **Prevents:** a future update destructively wiping the friend's 30-day transmission history or the permanently-locked CAP-6 registration fields
 - **Rule:** After v1 is installed on the friend's tablet, every Room schema change ships an explicit `Migration`. `fallbackToDestructiveMigration()` is never used in a build meant to install over an existing install with real data.
 
+### AD-16 — Master schedule is a flat, receiver-independent table, consulted live at dispatch time
+- **Binds:** CAP-2, CAP-9, CAP-3, CAP-4 (dispatch)
+- **Prevents:** copying/materializing the master schedule's times onto each schedule-less receiver at save time (which would silently desync the moment the master schedule is later edited), and a partial-merge model where a receiver could end up using *some* of its own times and *some* of the master's
+- **Rule:** `MasterSchedule` is a new, receiver-independent table (`{id, time}`, no FK) — same shape as `ReceiverSchedule` minus the `receiverId` column. `SendDispatcher`'s dispatch loop (AD-12) checks a receiver's own `ReceiverSchedule` rows first; if that list is empty, it queries `MasterSchedule` instead for that dispatch tick — never copied onto the receiver's own rows. A receiver with any schedule of its own never consults `MasterSchedule` at all, even partially.
+
 ## Consistency Conventions
 
 | Concern | Convention |
 | --- | --- |
-| Naming (entities, files, interfaces, events) | Entities: `Image`, `Receiver`, `ReceiverSchedule`, `Transmission`, `ComplianceState`, `RetentionSetting` (PascalCase singular). DAOs: `<Entity>Dao`. Repository interfaces: `<Area>Repository`; impls: `<Area>RepositoryImpl`. Workers: `<Purpose>Worker` (e.g. `SendWorker`, `RetentionPurgeWorker`, `ComplianceCheckWorker`). ViewModels: `<Screen>ViewModel`. Compose screens: `<Screen>Screen`. |
-| Data & formats (ids, dates, error shapes, envelopes) | IDs: `Long` autoincrement (AD-6). Dates: epoch-millis in DB, `Instant` in domain (AD-7). Enums stored as `String` names: `channel` = `WHATSAPP`\|`EMAIL`; `status` = `PENDING`\|`SENT`\|`FAILED`. Errors: `AppResult<T>` sealed class (AD-8). `ReceiverSchedule.time`: `Int` minutes-since-midnight, device local time — a receiver has one or more (`receiverId` FK, minimum 4 enforced at save time, not schema-level). `RetentionSetting` and `COMPLIANCE_STATE` are singleton tables: exactly one row, seeded at DB creation with `id = 1`, always read/written at that fixed id — no other insert path exists. |
+| Naming (entities, files, interfaces, events) | Entities: `Image`, `Receiver`, `ReceiverSchedule`, `Transmission`, `ComplianceState`, `RetentionSetting`, `MasterSchedule` (PascalCase singular). DAOs: `<Entity>Dao`. Repository interfaces: `<Area>Repository`; impls: `<Area>RepositoryImpl`. Workers: `<Purpose>Worker` (e.g. `SendWorker`, `RetentionPurgeWorker`, `ComplianceCheckWorker`). ViewModels: `<Screen>ViewModel`. Compose screens: `<Screen>Screen`. |
+| Data & formats (ids, dates, error shapes, envelopes) | IDs: `Long` autoincrement (AD-6). Dates: epoch-millis in DB, `Instant` in domain (AD-7). Enums stored as `String` names: `channel` = `WHATSAPP`\|`EMAIL`; `status` = `PENDING`\|`SENT`\|`FAILED`. Errors: `AppResult<T>` sealed class (AD-8). `ReceiverSchedule.time`: `Int` minutes-since-midnight, device local time — a receiver has zero or more (`receiverId` FK); if any exist, minimum 4 enforced at save time, not schema-level (AD-16). `MasterSchedule.time`: same `Int` convention, no FK (app-wide), same minimum-4-if-any-exist rule — except at least 4 rows always exist here, seeded at DB creation (see migration). `RetentionSetting` and `COMPLIANCE_STATE` are singleton tables: exactly one row, seeded at DB creation with `id = 1`, always read/written at that fixed id — no other insert path exists. |
 | State & cross-cutting (mutation, errors, logging, config, auth) | Unidirectional data flow: Room `Flow` → Repository → ViewModel `StateFlow` → Compose `collectAsStateWithLifecycle()`. Mutation only via Repository (AD-5). Logging via one `Logger` wrapper, tagged per module (`"ImgDist:<Component>"`). Config centralized in `config/AppConfig.kt` (AD-3). Auth: none on compliance/registration APIs (per spec); WhatsApp Cloud API token also lives only in `AppConfig`. |
 
 ## Stack
@@ -188,6 +193,10 @@ erDiagram
     long receiverId
     int time
   }
+  MASTER_SCHEDULE {
+    long id
+    int time
+  }
   IMAGE {
     long id
     string filePath
@@ -226,6 +235,7 @@ erDiagram
 | CAP-6 First-run registration | `ui/setup`, `data/remote` (registration call) | AD-2, AD-3, `mechanics.md` (name/city locked permanently, no edit path) |
 | CAP-7 Compliance/licensing gate | `domain/ComplianceGate`, `worker/ComplianceCheckWorker` | AD-2, AD-3, AD-10, AD-11 |
 | CAP-8 Retention/purge | `domain/RetentionPolicy`, `worker/RetentionPurgeWorker` | AD-10; default retention 30 days (`mechanics.md`), operator-configurable |
+| CAP-9 Master schedule fallback | `data/local` (MasterSchedule entity), `ui/settings`, `worker/SendWorker` (dispatch fallback) | AD-16; `mechanics.md` (evaluated live, never merged/copied) |
 
 ## Deferred
 

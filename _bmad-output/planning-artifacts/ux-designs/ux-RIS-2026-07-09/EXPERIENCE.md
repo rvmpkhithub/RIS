@@ -25,9 +25,9 @@ Android, Jetpack Compose, Material 3 defaults (no custom UI system). `DESIGN.md`
 | Compliance Halt | Setup, or any subsequent launch/background check that returns explicit non-compliant | Dead-end: app is not usable, contact admin |
 | Image Library | Bottom nav | Upload images; toggle active/inactive |
 | Receivers | Bottom nav | List, add, edit, remove receivers |
-| Receiver Edit | Receivers row tap, or "+" | One receiver's fields: name, channel, contact, count range, schedule times (one or more, minimum 4) |
+| Receiver Edit | Receivers row tap, or "+" | One receiver's fields: name, channel, contact, count range, schedule times (optional; if any are given, minimum 4 — falls back to the master schedule if left empty) |
 | Dashboard | Bottom nav | Per-receiver timestamped send history, 30+ days |
-| Settings | Bottom nav | **[ASSUMPTION — IA gap closed]** Retention-period control (Story 3.2 needed a home; none was named in the architecture's source tree, so a lightweight Settings surface is added here) |
+| Settings | Bottom nav | Retention-period control (Story 3.2) and the master schedule (Story 2.3) — the app-wide default schedule times used by any receiver with none of its own |
 
 Bottom `NavigationBar` (Images / Receivers / Dashboard / Settings) is the only top-level nav — four items, no drawer, no tabs-within-tabs. Setup and Compliance Halt sit outside this nav entirely; they're gates, not destinations.
 
@@ -53,7 +53,7 @@ Behavioral; visual specs live in `DESIGN.md.Components`.
 | Image grid item | Image Library | Tap toggles active/inactive directly on the grid (no separate edit screen) — matches Story 1.2's "toggle to inactive" being the entire interaction. |
 | Receiver row | Receivers list | Tap → Receiver Edit. Swipe-to-delete (native pattern) with a confirm dialog — deletion is destructive and not undoable, per no persistence rule for removed receivers. |
 | Receiver Edit form | Receivers | Channel choice (WhatsApp/email) is a segmented control at the top; it changes which contact field shows below (phone vs. email) — never show both fields at once. |
-| Schedule time list | Receiver Edit | A receiver has one or more daily send times (minimum 4). Each time is its own row with an add/remove control; "Add time" opens the same time picker used elsewhere. Save is blocked with an inline error below the list ("Add at least 4 schedule times.") until the minimum is met — same inline-error-under-the-field pattern as the rest of this form, not a dialog/toast. |
+| Schedule time list | Receiver Edit, Settings (master schedule) | A receiver's own schedule is optional — zero times is valid and means "use the master schedule." If the operator adds any, the same minimum of 4 applies. Each time is its own row with an add/remove control; "Add time" opens the same time picker used elsewhere. Save is blocked with the same inline error ("Add at least 4 schedule times.") only when the list is *partially* filled (1–3 times) — an empty list is not an error. The master schedule in Settings reuses this exact component, except it can never be emptied below 4 once seeded (there's no receiver to "fall back," so Settings enforces the minimum unconditionally). |
 | Compliance Halt screen | Gate | No interactive elements at all beyond system back/home. No retry button — per CAP-7/mechanics.md, only an external admin action (not a user action) can resolve this. A retry button would falsely suggest the operator can fix it himself. |
 | Dashboard receiver picker | Dashboard | Simple dropdown/segmented selector at the top of the screen; switching it reloads the list below without leaving the screen. |
 | Retention row | Settings | Tap opens a numeric picker (days), not a slider — the value only ever needs coarse adjustment (e.g. 30 → 60), never fine-grained. |
@@ -70,6 +70,7 @@ Behavioral; visual specs live in `DESIGN.md.Components`.
 | Empty dashboard (new receiver, nothing sent yet) | Dashboard | "Nothing sent to this receiver yet." |
 | Background send failure (retries exhausted) | (invisible) | Per the fail-open/graceful-degradation architecture, delivery failures are not surfaced as user-facing errors — the dashboard simply won't show a "Sent" entry for that slot. **[ASSUMPTION — flag for review]:** no story currently calls for a visible "failed" indicator; if the operator needs to know a send silently failed, that's a gap worth raising against epics.md, not something this UX pass should invent unasked. |
 | Receiver form validation | Receiver Edit | Inline error text under the field ("Enter a valid phone number."), not a dialog/toast |
+| Master schedule partially filled (1–3 times) | Settings | Same inline error as Receiver Edit's schedule list ("Add at least 4 schedule times."), blocking save until 4+ or reverted to the last-saved value |
 
 ## Interaction Primitives
 

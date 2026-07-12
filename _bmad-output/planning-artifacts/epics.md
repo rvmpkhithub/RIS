@@ -125,19 +125,23 @@ So that I control exactly what can be sent.
 ### Story 1.3: Receiver Configuration
 
 As the operator,
-I want to add and manage receivers with their contact details, delivery channel, per-receiver image-count range, and one or more daily schedule times,
+I want to add and manage receivers with their contact details, delivery channel, per-receiver image-count range, and optionally their own daily schedule times,
 So that each receiver gets exactly the distribution I've set up for them.
 
 **Acceptance Criteria:**
 
 **Given** I'm on the receivers screen
-**When** I add a new receiver with a name, a +91 phone number (for WhatsApp) or an email address (for email), a min/max daily image count, and one or more daily schedule times (minimum 4)
+**When** I add a new receiver with a name, a +91 phone number (for WhatsApp) or an email address (for email), a min/max daily image count, and *optionally* one or more daily schedule times (if any are given, minimum 4)
 **Then** the receiver is saved and appears in my receiver list
 
 **Given** a receiver exists
 **When** I edit or remove it
 **Then** the change is saved and takes effect from the next scheduled send onward
 **And** changing one receiver's settings never affects another receiver's schedule, channel, or count range
+
+**Given** a receiver has no schedule times of its own
+**When** the app checks for a scheduled send
+**Then** it uses the app-wide master schedule instead (Story 2.3)
 
 ## Epic 2: Automated Daily Distribution
 
@@ -185,6 +189,28 @@ So that a bad network moment doesn't mean a missed day for a customer.
 **Given** the device was offline through an entire scheduled window
 **When** connectivity returns
 **Then** only that day's missed batch is resumed — earlier missed days are not backfilled
+
+### Story 2.3: Master Schedule Fallback
+
+As the operator,
+I want to set one app-wide default schedule that receivers use automatically when I haven't given them their own,
+So that I'm not forced to configure a schedule for every single receiver.
+
+**Acceptance Criteria:**
+
+**Given** I'm in Settings
+**When** I configure the master schedule with one or more daily times (minimum 4)
+**Then** it's saved and used by every receiver that has no schedule of its own
+
+**Given** a receiver has no schedule times of its own
+**When** a scheduled-send check runs for that receiver
+**Then** it uses the master schedule's times instead, evaluated fresh each time (not copied onto the receiver)
+
+**Given** I change the master schedule
+**When** the new value is saved
+**Then** it takes effect from the next scheduled-send check onward, for every receiver still relying on it
+
+**Technical note:** depends on Story 1.3's schedule becoming optional and Story 2.2's `SendDispatcher` (extends its dispatch loop with a fallback branch); no changes to the queue/retry/offline-recovery logic those stories already established.
 
 ## Epic 3: Delivery Proof & Data Housekeeping
 
