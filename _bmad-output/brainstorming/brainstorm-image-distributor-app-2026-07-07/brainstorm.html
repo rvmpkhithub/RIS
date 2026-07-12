@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Image Distributor — Brainstorm Keepsake</title>
+<style>
+  :root{
+    --paper:#fbf6ec;
+    --paper-dark:#efe6d2;
+    --ink:#2b2620;
+    --ink-soft:#5c5346;
+    --wa-green:#25d366;
+    --wa-green-dark:#128c7e;
+    --wa-teal:#075e54;
+    --amber:#e0912b;
+    --red:#c2452c;
+    --gold:#c9a13b;
+    --shadow: 0 10px 30px rgba(43,38,32,.18);
+    --radius: 14px;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(circle at 15% 8%, rgba(37,211,102,.10), transparent 45%),
+      radial-gradient(circle at 85% 20%, rgba(224,145,43,.10), transparent 40%),
+      var(--paper);
+    color:var(--ink);
+    font-family: Georgia, 'Iowan Old Style', 'Palatino Linotype', Palatino, serif;
+    line-height:1.55;
+    overflow-x:hidden;
+  }
+  .wrap{max-width:980px;margin:0 auto;padding:0 24px;}
+  h1,h2,h3{font-family: Georgia, 'Palatino Linotype', serif; margin:0;}
+  .sans{font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;}
+  code, .mono{font-family: 'Consolas','SFMono-Regular',Menlo,monospace;}
+
+  /* ---------- HERO ---------- */
+  .hero{
+    position:relative;
+    padding:72px 0 60px;
+    text-align:center;
+    background: linear-gradient(180deg, var(--wa-teal) 0%, var(--wa-green-dark) 55%, var(--paper) 100%);
+    color:#fdfdf6;
+    overflow:hidden;
+  }
+  .hero::before{
+    content:"";
+    position:absolute; inset:0;
+    background-image:
+      radial-gradient(circle, rgba(255,255,255,.08) 1px, transparent 1.4px);
+    background-size:22px 22px;
+    opacity:.5;
+    pointer-events:none;
+  }
+  .polaroid-drift{
+    position:absolute;
+    width:64px;height:78px;
+    background:#fdfdf6;
+    border:4px solid #fdfdf6;
+    border-bottom-width:16px;
+    border-radius:2px;
+    box-shadow:0 8px 18px rgba(0,0,0,.25);
+    opacity:.85;
+    animation: floaty 9s ease-in-out infinite;
+  }
+  .polaroid-drift::after{
+    content:"";
+    position:absolute; inset:4px 4px 20px 4px;
+    background: repeating-linear-gradient(45deg, #cfe8d8, #cfe8d8 6px, #bcdfc9 6px, #bcdfc9 12px);
+    border-radius:1px;
+  }
+  .p1{top:12%; left:6%; transform:rotate(-12deg); animation-delay:0s;}
+  .p2{top:60%; left:12%; transform:rotate(8deg); animation-delay:1.2s; width:46px;height:58px;}
+  .p3{top:20%; right:8%; transform:rotate(10deg); animation-delay:2.1s;}
+  .p4{top:66%; right:14%; transform:rotate(-9deg); animation-delay:.6s; width:50px;height:62px;}
+  @keyframes floaty{
+    0%,100%{ transform:translateY(0) rotate(var(--r,0deg)); }
+    50%{ transform:translateY(-16px) rotate(var(--r,0deg)); }
+  }
+  .phone{
+    position:relative;
+    z-index:2;
+    display:inline-block;
+    background:#0e1b18;
+    border-radius:34px;
+    padding:16px 14px;
+    box-shadow: var(--shadow), 0 0 0 6px rgba(255,255,255,.06);
+    max-width:560px;
+    width:92%;
+  }
+  .phone-notch{
+    width:70px;height:8px;border-radius:6px;background:#0e1b18;
+    margin:0 auto 10px; position:relative; z-index:3;
+    box-shadow: inset 0 0 0 2px #1c2e2a;
+  }
+  .phone-screen{
+    background: linear-gradient(180deg,#e9f8ef,#fdfdf6 60%);
+    border-radius:20px;
+    padding:26px 22px 22px;
+    color:var(--ink);
+  }
+  .app-icon{
+    width:56px;height:56px;border-radius:16px;margin:0 auto 14px;
+    background: conic-gradient(from 200deg, var(--wa-green), var(--gold), var(--wa-green));
+    display:flex;align-items:center;justify-content:center;
+    font-size:26px; box-shadow: 0 4px 12px rgba(0,0,0,.25);
+  }
+  .hero h1{font-size:2.1rem; letter-spacing:.5px;}
+  .hero .tagline{
+    font-family:'Segoe UI', system-ui, sans-serif;
+    font-style:italic; color:var(--ink-soft); margin-top:8px; font-size:1rem;
+  }
+  .chip-row{
+    display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:18px;
+    font-family:'Segoe UI', system-ui, sans-serif; font-size:.78rem;
+  }
+  .chip{
+    background:var(--wa-green); color:#08281c; padding:5px 12px; border-radius:999px;
+    font-weight:600; box-shadow:0 2px 4px rgba(0,0,0,.15);
+  }
+  .chip.alt{ background:var(--paper-dark); color:var(--ink-soft); }
+  .meta-card{
+    text-align:left; margin-top:18px; padding:14px 16px; background:#fff;
+    border-radius:10px; border:1px dashed #cbb98a; font-family:'Segoe UI',system-ui,sans-serif;
+    font-size:.83rem; color:var(--ink-soft);
+  }
+  .meta-card b{color:var(--ink);}
+
+  /* ---------- SECTION HEADERS ---------- */
+  .section{ padding:70px 0 40px; position:relative;}
+  .section-kicker{
+    font-family:'Segoe UI', system-ui, sans-serif;
+    text-transform:uppercase; letter-spacing:3px; font-size:.72rem;
+    font-weight:700; color:var(--wa-green-dark); margin-bottom:6px;
+  }
+  .section-title{ font-size:1.9rem; margin-bottom:6px;}
+  .section-sub{ color:var(--ink-soft); max-width:640px; font-family:'Segoe UI',system-ui,sans-serif; font-size:.95rem;}
+
+  /* ===================================================================
+     SECTION 1 — YES, AND... BUILDING  (stacked / leaning tower)
+     =================================================================== */
+  .stack{ position:relative; max-width:640px; margin:46px auto 0; padding-left:26px;}
+  .stack::before{
+    content:""; position:absolute; left:26px; top:0; bottom:0; width:2px;
+    background:repeating-linear-gradient(180deg, var(--wa-green) 0 6px, transparent 6px 12px);
+  }
+  .block{
+    position:relative;
+    background:#fff;
+    border:1px solid #e6dcc2;
+    border-left:6px solid var(--wa-green-dark);
+    border-radius:10px;
+    padding:16px 18px 16px 22px;
+    margin:0 0 22px 20px;
+    box-shadow: var(--shadow);
+    opacity:0;
+    animation: dropIn .6s ease forwards;
+  }
+  .block:nth-of-type(1){animation-delay:.05s; transform-origin:top left;}
+  .block:nth-of-type(2){animation-delay:.35s;}
+  .block:nth-of-type(3){animation-delay:.65s;}
+  .block:nth-of-type(4){animation-delay:.95s;}
+  .block:nth-of-type(5){animation-delay:1.25s;}
+  .block:nth-of-type(6){animation-delay:1.55s;}
+  @keyframes dropIn{
+    from{ opacity:0; transform:translateY(-14px) rotate(-2deg);}
+    to{ opacity:1; transform:translateY(0) rotate(0deg);}
+  }
+  .block .tag{
+    font-family:'Segoe UI',system-ui,sans-serif; font-size:.68rem; font-weight:700;
+    text-transform:uppercase; letter-spacing:1.5px; color:var(--wa-green-dark);
+    display:inline-block; margin-bottom:6px;
+  }
+  .block:first-child .tag{ color:var(--gold); }
+  .block p{ margin:0; font-size:.98rem; }
+  .connector{
+    text-align:center; font-family:'Segoe UI',system-ui,sans-serif; font-size:.78rem;
+    color:var(--ink-soft); font-style:italic; margin: -12px 0 12px 20px;
+  }
+  .revise-wrap{ position:relative; margin-left:20px;}
+  .block.old{
+    background:#f3ede0; border-left-color:#b7ab8c; color:#8b8071;
+    text-decoration:line-through; transform:rotate(-3deg) translateY(4px) scale(.97);
+    box-shadow:none; margin-bottom:-8px; position:relative; z-index:1;
+  }
+  .block.new{
+    position:relative; z-index:2; border-left-color:var(--red);
+    box-shadow: var(--shadow); transform:none;
+    margin-left:20px;
+  }
+  .block.new .tag{ color:var(--red); }
+  .supersede-ribbon{
+    position:absolute; top:-10px; right:14px;
+    background:var(--red); color:#fff; font-family:'Segoe UI',system-ui,sans-serif;
+    font-size:.62rem; font-weight:700; letter-spacing:1px; padding:3px 9px;
+    border-radius:4px; box-shadow:0 3px 6px rgba(0,0,0,.25); transform:rotate(3deg);
+  }
+
+  /* ===================================================================
+     SECTION 2 — JOB TO BE DONE  (peeling layers)
+     =================================================================== */
+  .peel-stack{ max-width:660px; margin:46px auto 0; }
+  .peel{
+    position:relative;
+    background:#fff;
+    border:1px solid #e6dcc2;
+    border-radius:8px;
+    padding:16px 20px;
+    margin: 0 auto 4px;
+    box-shadow: 0 4px 10px rgba(43,38,32,.10);
+  }
+  .peel .layer-label{
+    font-family:'Segoe UI',system-ui,sans-serif; font-size:.66rem; text-transform:uppercase;
+    letter-spacing:1.5px; color:var(--ink-soft); font-weight:700; margin-bottom:4px;
+  }
+  .peel p{margin:0; font-size:.95rem;}
+  .peel::after{
+    content:"";
+    position:absolute; top:0; right:0; width:0; height:0;
+    border-style:solid;
+    border-width:0 22px 22px 0;
+    border-color: transparent var(--paper) transparent transparent;
+    filter:drop-shadow(-2px 2px 2px rgba(0,0,0,.15));
+  }
+  .peel.l1{ width:100%; }
+  .peel.l2{ width:94%; }
+  .peel.l3{ width:88%; }
+  .peel.l4{ width:82%; background:#fdf9ee;}
+
+  .core-insight{
+    position:relative;
+    margin: 30px auto 26px;
+    max-width:78%;
+    background: linear-gradient(160deg, #fff9ea, #fff3d1);
+    border:2px solid var(--gold);
+    border-radius:14px;
+    padding:26px 26px 22px;
+    text-align:center;
+    box-shadow: 0 14px 30px rgba(201,161,59,.35);
+  }
+  .core-insight .ribbon{
+    position:absolute; top:-14px; left:50%; transform:translateX(-50%);
+    background:var(--gold); color:#3a2e05; font-family:'Segoe UI',system-ui,sans-serif;
+    font-weight:700; font-size:.68rem; letter-spacing:2px; text-transform:uppercase;
+    padding:5px 16px; border-radius:999px; box-shadow:0 3px 8px rgba(0,0,0,.2);
+  }
+  .core-insight p{ font-size:1.05rem; margin:0; }
+
+  .unlock-row{ display:flex; gap:16px; flex-wrap:wrap; margin-top:26px; }
+  .polaroid-card{
+    flex:1 1 220px;
+    background:#fff; border:6px solid #fff; border-bottom-width:26px;
+    box-shadow: var(--shadow);
+    border-radius:2px; transform:rotate(var(--rot,-2deg));
+    padding:0;
+  }
+  .polaroid-card .inner{
+    background: linear-gradient(160deg,#e9f8ef,#f2ede0);
+    padding:16px 12px; min-height:110px; display:flex; flex-direction:column; justify-content:center;
+  }
+  .polaroid-card .cap{
+    font-family:'Segoe UI',system-ui,sans-serif; text-align:center; font-size:.82rem;
+    color:var(--ink-soft); margin-top:6px;
+  }
+  .polaroid-card p{ margin:0; font-size:.85rem; text-align:center;}
+  .polaroid-card:nth-child(2){ --rot: 2deg; }
+  .polaroid-card:nth-child(3){ --rot: -1deg; }
+
+  /* ===================================================================
+     SECTION 3 — CHAOS ENGINEERING  (stress / break / rebuild)
+     =================================================================== */
+  .section-chaos{
+    background:
+      repeating-linear-gradient(135deg, rgba(194,69,44,.05) 0 14px, transparent 14px 28px),
+      var(--paper);
+    border-top:4px dashed var(--red);
+    border-bottom:4px dashed var(--red);
+  }
+  .chaos-title{ position:relative; display:inline-block; }
+  .chaos-title h2{
+    animation: glitch 5s infinite;
+  }
+  @keyframes glitch{
+    0%,92%,100%{ text-shadow:none; transform:none; }
+    93%{ text-shadow: 2px 0 var(--red), -2px 0 var(--wa-green-dark); transform:translateX(1px);}
+    94%{ text-shadow: -2px 0 var(--red), 2px 0 var(--wa-green-dark); transform:translateX(-1px);}
+    95%{ text-shadow:none; transform:none;}
+  }
+  .chaos-grid{
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(250px,1fr));
+    gap:20px; margin-top:36px;
+  }
+  .chaos-card{
+    background:#fff;
+    border:1px solid #e6dcc2;
+    border-radius:6px;
+    padding:16px 18px;
+    position:relative;
+    box-shadow: 0 6px 16px rgba(43,38,32,.14);
+    clip-path: polygon(0 2%, 3% 0, 97% 1%, 100% 4%, 99% 97%, 96% 100%, 2% 99%, 0 96%);
+  }
+  .chaos-card::before{
+    content:"⚠ FAILURE INJECTED";
+    display:block; font-family:'Segoe UI',system-ui,sans-serif; font-size:.62rem;
+    font-weight:800; letter-spacing:1px; color:var(--red); margin-bottom:6px;
+  }
+  .chaos-card .failure{ font-size:.86rem; color:var(--ink-soft); font-style:italic; margin-bottom:8px;}
+  .chaos-card .response-label{
+    font-family:'Segoe UI',system-ui,sans-serif; font-size:.62rem; font-weight:800;
+    letter-spacing:1px; color:var(--wa-green-dark); margin-bottom:4px;
+  }
+  .chaos-card .response-label::before{ content:"✓ SYSTEM SURVIVES — "; }
+  .chaos-card p.response{ font-size:.92rem; margin:0;}
+  .chaos-card.supersede{ border:1px solid var(--red); }
+  .chaos-card.supersede .callback{
+    margin-top:8px; font-family:'Segoe UI',system-ui,sans-serif; font-size:.68rem;
+    background:#fdece7; color:var(--red); padding:4px 8px; border-radius:4px; display:inline-block;
+  }
+  .out-of-scope{
+    margin-top:28px; padding:18px 22px; text-align:center;
+    background: repeating-linear-gradient(45deg, #2b2620, #2b2620 12px, #e0912b 12px, #e0912b 24px);
+    border-radius:6px; color:#fff;
+  }
+  .out-of-scope .inner{
+    background:#2b2620; margin:0 auto; padding:12px 20px; border-radius:4px; max-width:90%;
+    font-family:'Segoe UI',system-ui,sans-serif; font-size:.85rem;
+  }
+  .out-of-scope b{ color:var(--amber);}
+
+  .fail-open-banner{
+    margin-top:40px; text-align:center; padding:22px;
+    background: linear-gradient(160deg,#0e1b18,#1d332c);
+    color:#fdfdf6; border-radius:14px; box-shadow: var(--shadow);
+  }
+  .fail-open-banner .law{
+    font-size:1.3rem; font-weight:700; letter-spacing:.5px; margin-bottom:6px;
+  }
+  .fail-open-banner .law em{ color:var(--wa-green); font-style:normal;}
+  .fail-open-banner p{ font-family:'Segoe UI',system-ui,sans-serif; font-size:.85rem; color:#cfe8d8; max-width:560px; margin:0 auto;}
+
+  /* ===================================================================
+     SECTION 4 — SYNTHESIS  (climax: strands converge)
+     =================================================================== */
+  .section-synth{
+    text-align:center;
+    background: radial-gradient(circle at 50% 0%, rgba(201,161,59,.15), transparent 60%);
+  }
+  .strands{
+    position:relative; max-width:760px; margin:50px auto 10px; height:190px;
+  }
+  .strand{
+    position:absolute; bottom:90px; width:31%; height:100px;
+    border-radius:60px 60px 0 0;
+    opacity:.85;
+  }
+  .strand.s1{ left:2%; background:linear-gradient(180deg, var(--wa-green), transparent); }
+  .strand.s2{ left:35%; background:linear-gradient(180deg, #3aa0c9, transparent); }
+  .strand.s3{ left:68%; background:linear-gradient(180deg, var(--amber), transparent); }
+  .strand-label{
+    position:absolute; top:-26px; left:50%; transform:translateX(-50%);
+    font-family:'Segoe UI',system-ui,sans-serif; font-size:.7rem; font-weight:700;
+    white-space:nowrap; color:var(--ink-soft);
+  }
+  .converge-point{
+    position:absolute; left:50%; bottom:0; transform:translateX(-50%);
+    width:26px; height:26px; border-radius:50%;
+    background: radial-gradient(circle, #fff, var(--gold));
+    box-shadow:0 0 0 8px rgba(201,161,59,.25), 0 0 24px rgba(201,161,59,.6);
+    animation: pulseGlow 2.4s ease-in-out infinite;
+  }
+  @keyframes pulseGlow{
+    0%,100%{ box-shadow:0 0 0 8px rgba(201,161,59,.25), 0 0 24px rgba(201,161,59,.6);}
+    50%{ box-shadow:0 0 0 14px rgba(201,161,59,.12), 0 0 38px rgba(201,161,59,.9);}
+  }
+
+  .synth-cards{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:18px; text-align:left; margin-top:10px;}
+  .synth-card{
+    background:#fff; border-radius:12px; padding:18px 20px; box-shadow:var(--shadow);
+    border-top:5px solid var(--wa-green);
+  }
+  .synth-card:nth-child(2){ border-top-color:#3aa0c9; }
+  .synth-card:nth-child(3){ border-top-color:var(--amber); }
+  .synth-card h3{ font-size:.95rem; margin-bottom:8px; }
+  .synth-card p{ font-size:.88rem; color:var(--ink-soft); margin:0;}
+
+  .ledger{
+    margin:30px auto 8px; max-width:520px; border-collapse:collapse;
+    font-family:'Consolas',monospace; font-size:.78rem; background:#fff;
+    box-shadow: var(--shadow); border-radius:8px; overflow:hidden;
+  }
+  .ledger th{ background:#075e54; color:#fff; padding:8px 10px; text-align:left; font-weight:600;}
+  .ledger td{ padding:6px 10px; border-bottom:1px solid #eee; color:var(--ink-soft);}
+  .ledger caption{ caption-side:top; font-family:'Segoe UI',system-ui,sans-serif; font-size:.72rem; color:var(--ink-soft); padding-bottom:8px; text-align:left;}
+
+  .plaque{
+    margin:56px auto 10px; max-width:640px;
+    background: linear-gradient(160deg,#fff9ea,#fdf3d3);
+    border:3px solid var(--gold);
+    border-radius:16px; padding:32px 30px;
+    box-shadow: 0 20px 40px rgba(201,161,59,.4);
+    position:relative;
+  }
+  .plaque::before{
+    content:"CHOSEN DIRECTION";
+    position:absolute; top:-14px; left:50%; transform:translateX(-50%);
+    background:var(--gold); color:#3a2e05; font-family:'Segoe UI',system-ui,sans-serif;
+    font-weight:800; font-size:.7rem; letter-spacing:2px; padding:6px 18px; border-radius:999px;
+    box-shadow:0 4px 10px rgba(0,0,0,.25);
+  }
+  .plaque p{ font-size:1.08rem; margin:6px 0 0; }
+
+  footer{
+    text-align:center; padding:50px 20px 60px; color:var(--ink-soft);
+    font-family:'Segoe UI',system-ui,sans-serif; font-size:.8rem;
+  }
+  footer .stamp{
+    display:inline-block; border:2px solid var(--wa-green-dark); color:var(--wa-green-dark);
+    padding:6px 14px; border-radius:6px; transform:rotate(-4deg); font-weight:700;
+    letter-spacing:1px; margin-bottom:10px;
+  }
+
+  @media (max-width: 640px){
+    .hero h1{ font-size:1.5rem; }
+    .strands{ height:auto; padding-bottom:40px;}
+    .strand{ position:relative; width:90%; margin:0 auto 10px; bottom:auto; height:44px; left:0 !important; border-radius:12px;}
+    .strand-label{ position:static; transform:none; display:block; margin-bottom:2px;}
+    .converge-point{ position:relative; margin:10px auto 0; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- ================= HERO ================= -->
+  <section class="hero">
+    <div class="polaroid-drift p1"></div>
+    <div class="polaroid-drift p2"></div>
+    <div class="polaroid-drift p3"></div>
+    <div class="polaroid-drift p4"></div>
+    <div class="wrap">
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-screen">
+          <div class="app-icon">🖼️</div>
+          <h1>The Image Distributor</h1>
+          <p class="tagline">a brainstorm about photos, subscriptions,<br>and the fine print nobody reads</p>
+          <div class="chip-row">
+            <span class="chip">Facilitator mode</span>
+            <span class="chip alt">Status: complete</span>
+            <span class="chip alt">Updated 2026-07-07 · 07:02</span>
+          </div>
+          <div class="meta-card">
+            <b>Topic:</b> A sideloaded tablet/phone app that scheduled-sends random images to WhatsApp/email receivers on a random daily cadence &mdash; with an offline-safe queue, a hidden compliance check, a 30-day dashboard, and local Postgres underneath.<br><br>
+            <b>Goal:</b> Push past the given spec &mdash; architecture, setup + dashboard UX, scheduling/randomization logic, queue &amp; failure-recovery design, compliance-check behavior, and the edge cases nobody had hit yet.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SECTION 1: YES AND ================= -->
+  <section class="section section-yesand">
+    <div class="wrap">
+      <div class="section-kicker">Technique 1 of 3</div>
+      <h2 class="section-title">Yes, And… Building</h2>
+      <p class="section-sub">One quiet line in the spec &mdash; "hidden compliance check" &mdash; became a tower. Each idea accepted the last and added one more brick, all the way up.</p>
+
+      <div class="stack">
+        <div class="block">
+          <span class="tag">The seed</span>
+          <p>The compliance API takes a customer's <b>name + city</b> and returns a compliant status &mdash; true/false, or something richer, TBD.</p>
+        </div>
+        <div class="connector">↳ yes, and…</div>
+        <div class="block">
+          <span class="tag">Yes, and</span>
+          <p>There's <b>no expiry date</b> on that status. It lives in a separate external app's database and gets checked <b>live</b> over the API.</p>
+        </div>
+        <div class="connector">↳ yes, and…</div>
+        <div class="block">
+          <span class="tag">Yes, and</span>
+          <p>The result gets <b>cached locally for 2 days</b> before a fresh check is required.</p>
+        </div>
+        <div class="connector">↳ yes, and…</div>
+        <div class="block">
+          <span class="tag">Yes, and</span>
+          <p>If the device is <b>online, always call the API fresh</b> &mdash; the 2-day cache only kicks in when offline.</p>
+        </div>
+        <div class="connector">↳ yes, and…</div>
+        <div class="block">
+          <span class="tag">Yes, and</span>
+          <p>On a <b>non-compliant</b> result, the app halts entirely at that screen with a "contact admin" message. Nothing else changes or breaks.</p>
+        </div>
+        <div class="connector">↳ yes, and…</div>
+
+        <div class="revise-wrap">
+          <div class="block old">
+            <span class="tag">Yes, and (first take)</span>
+            <p>Name + city entered at first run can be edited later if the customer wants to correct it.</p>
+          </div>
+          <div class="block new">
+            <span class="supersede-ribbon">Revised</span>
+            <span class="tag">Actually…</span>
+            <p><b>Lock</b> the name + city permanently after first entry &mdash; and simultaneously <b>POST</b> that info to the admin's own database to register the install.</p>
+          </div>
+        </div>
+
+        <div class="connector">↳ yes, and…</div>
+        <div class="block">
+          <span class="tag">Yes, and</span>
+          <p>The install registers as <b>compliant by default</b>; the admin manually flips it to non-compliant separately, offline, from this app entirely.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SECTION 2: JOB TO BE DONE ================= -->
+  <section class="section section-jtbd">
+    <div class="wrap">
+      <div class="section-kicker">Technique 2 of 3</div>
+      <h2 class="section-title">Job To Be Done</h2>
+      <p class="section-sub">Peeling back the stated task to find the real one underneath. Each layer looked like the answer &mdash; until the next peel revealed there was more to it.</p>
+
+      <div class="peel-stack">
+        <div class="peel l1">
+          <div class="layer-label">Layer 1 · what he said he needs</div>
+          <p>Automate a manual daily image-sending task that currently eats a lot of his time.</p>
+        </div>
+        <div class="peel l2">
+          <div class="layer-label">Layer 2 · watching the manual process</div>
+          <p>Images must not repeat immediately for the same receiver.</p>
+        </div>
+        <div class="peel l3">
+          <div class="layer-label">Layer 3 · why that rule exists</div>
+          <p>Receivers notice &mdash; and complain &mdash; if they get repeat images too often. Variety matters to keep them satisfied.</p>
+        </div>
+        <div class="peel l4">
+          <div class="layer-label">Layer 4 · who these people actually are</div>
+          <p>Receivers are <b>paying customers</b>, not internal contacts. This is a subscription content business, not a personal broadcast tool.</p>
+        </div>
+      </div>
+
+      <div class="core-insight">
+        <span class="ribbon">The real job</span>
+        <p>Reliably fulfill a <b>paid daily-image subscription</b> automatically, with enough variety that paying customers don't churn or complain. The compliance hook may be less about the receiver's location and more about the <b>app operator's own standing</b> &mdash; license, payment &mdash; with whoever runs the compliance API.</p>
+      </div>
+
+      <div class="unlock-row">
+        <div class="polaroid-card">
+          <div class="inner">
+            <p>Dashboard's real job: <b>proof of delivery</b> he can point to if a paying customer disputes "I didn't get my images."</p>
+          </div>
+          <div class="cap">📌 discovered need</div>
+        </div>
+        <div class="polaroid-card">
+          <div class="inner">
+            <p>Proof of delivery = a <b>timestamp per image</b> sent to each receiver, logged and viewable in the dashboard.</p>
+          </div>
+          <div class="cap">📌 discovered need</div>
+        </div>
+        <div class="polaroid-card">
+          <div class="inner">
+            <p>Min/max image count is <b>configurable per receiver</b>, not one global setting &mdash; different customers, different volume tiers.</p>
+          </div>
+          <div class="cap">📌 discovered need</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SECTION 3: CHAOS ENGINEERING ================= -->
+  <section class="section section-chaos">
+    <div class="wrap">
+      <div class="section-kicker">Technique 3 of 3</div>
+      <div class="chaos-title"><h2 class="section-title">⚡ Chaos Engineering</h2></div>
+      <p class="section-sub">Break it on purpose. Eight failures injected on the system, one at a time &mdash; and one clean law fell out of how it kept surviving.</p>
+
+      <div class="chaos-grid">
+        <div class="chaos-card">
+          <p class="failure">Connection drops, then reconnects mid-run.</p>
+          <div class="response-label"></div>
+          <p class="response">Only resend that day's missed batch. Do not backfill prior missed days &mdash; those are handled manually.</p>
+        </div>
+        <div class="chaos-card">
+          <p class="failure">An image is flagged inactive after being queued, but before it fires.</p>
+          <div class="response-label"></div>
+          <p class="response">It still gets sent. Inactive only affects future selection, not what's already queued.</p>
+        </div>
+        <div class="chaos-card">
+          <p class="failure">Active image count is less than the random Z chosen for the day.</p>
+          <div class="response-label"></div>
+          <p class="response">Send however many are active. No duplicates, no topping up.</p>
+        </div>
+        <div class="chaos-card supersede">
+          <p class="failure">The compliance API call itself fails or times out.</p>
+          <div class="response-label"></div>
+          <p class="response">Sending only stops on an explicit non-compliant response. If the check fails, just retry on the next scheduled run &mdash; and keep sending in the meantime.</p>
+          <span class="callback">↺ supersedes the 2-day cache rule from Technique 1</span>
+        </div>
+        <div class="chaos-card">
+          <p class="failure">Picking the next image to send to a receiver.</p>
+          <div class="response-label"></div>
+          <p class="response">Check that receiver's transmission queue/history first, so nothing already sent gets picked again.</p>
+        </div>
+        <div class="chaos-card">
+          <p class="failure">The active image pool is too small to satisfy the 7-day no-repeat window, mathematically.</p>
+          <div class="response-label"></div>
+          <p class="response">Repeats are allowed as a fallback.</p>
+        </div>
+        <div class="chaos-card">
+          <p class="failure">A send attempt fails outright.</p>
+          <div class="response-label"></div>
+          <p class="response">Retry 3 times regardless of the reason. Getting the receiver's number right is the friend's own responsibility.</p>
+        </div>
+      </div>
+
+      <div class="out-of-scope">
+        <div class="inner">
+          <b>OUT OF SCOPE ⚠ DO NOT INJECT HERE</b><br>
+          Payment/billing between the friend and his customers is handled entirely offline &mdash; not by this app.
+        </div>
+      </div>
+
+      <div class="fail-open-banner">
+        <div class="law">One law survived every test: <em>fail open, not closed.</em></div>
+        <p>Only an explicit non-compliant response is ever allowed to stop sending. A short image pool, an unreachable compliance API, an exhausted no-repeat window &mdash; all of it degrades gracefully instead of blocking.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SECTION 4: SYNTHESIS ================= -->
+  <section class="section section-synth">
+    <div class="wrap">
+      <div class="section-kicker">Synthesis</div>
+      <h2 class="section-title">Three threads, one system</h2>
+      <p class="section-sub">Three techniques, three angles &mdash; and they all converge on the same app.</p>
+
+      <div class="strands">
+        <div class="strand s1"><span class="strand-label">Licensing gate</span></div>
+        <div class="strand s2"><span class="strand-label">One ledger</span></div>
+        <div class="strand s3"><span class="strand-label">Fail open</span></div>
+        <div class="converge-point"></div>
+      </div>
+
+      <div class="synth-cards">
+        <div class="synth-card">
+          <h3>① The compliance hook is a licensing switch</h3>
+          <p>It doubles as a remote install-licensing switch for the sideloaded app itself &mdash; independent of the friend-customer payments, which stay entirely out of scope.</p>
+        </div>
+        <div class="synth-card">
+          <h3>② It's one ledger wearing three hats</h3>
+          <p>Proof-of-delivery, the 7-day no-repeat check, and the 30-day dashboard aren't three separate features &mdash; they're all views over one transmissions ledger.</p>
+          <table class="ledger">
+            <caption>transmissions</caption>
+            <thead><tr><th>receiver_id</th><th>image_id</th><th>sent_at</th><th>status</th></tr></thead>
+            <tbody>
+              <tr><td>r_014</td><td>img_882</td><td>2026-07-06 09:12</td><td>sent</td></tr>
+              <tr><td>r_014</td><td>img_356</td><td>2026-07-05 09:10</td><td>sent</td></tr>
+              <tr><td>r_022</td><td>img_701</td><td>2026-07-06 09:13</td><td>retried</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="synth-card">
+          <h3>③ Fail open, not closed</h3>
+          <p>A consistent design principle runs through every chaos answer: only an explicit non-compliant result may stop sending. Everything else degrades gracefully instead of blocking.</p>
+        </div>
+      </div>
+
+      <div class="plaque">
+        <p>Proceed with the app as a <b>subscription-fulfillment tool</b> &mdash; with proof-of-delivery, per-receiver tiers, and a licensing-style compliance gate.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="stamp">Session complete ✓</div><br>
+    Brainstorm captured 2026-07-07 · Facilitator mode · Techniques run: Yes-And Building → Job To Be Done → Chaos Engineering
+  </footer>
+
+</body>
+</html>

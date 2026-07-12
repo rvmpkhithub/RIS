@@ -1,0 +1,30 @@
+# Gradle
+.gradle/
+build/
+app/build/
+
+# Kotlin
+.kotlin/
+
+# Local configuration (machine-specific SDK path — never commit)
+local.properties
+
+# Android Studio / IntelliJ (not currently used in this project, but standard to exclude)
+.idea/
+*.iml
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Signing
+*.jks
+*.keystore
+
+# Logs
+*.log
+
+# This session's debugging/verification artifacts — not app source
+/screen*.png
+/emulator*.log
+/prompt.txt

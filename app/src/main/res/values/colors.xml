@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Must match DESIGN.md#colors surface / Theme.kt's Surface token exactly. -->
+    <color name="window_background">#FBF6EC</color>
+</resources>
