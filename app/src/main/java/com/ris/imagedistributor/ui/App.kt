@@ -32,8 +32,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ris.imagedistributor.di.AppContainer
 import com.ris.imagedistributor.ui.compliance.ComplianceHaltScreen
 import com.ris.imagedistributor.ui.dashboard.DashboardScreen
-import com.ris.imagedistributor.ui.images.ImageLibraryScreen
-import com.ris.imagedistributor.ui.images.ImageLibraryViewModel
+import com.ris.imagedistributor.ui.images.ImagesTab
 import com.ris.imagedistributor.ui.receivers.ReceiversTab
 import com.ris.imagedistributor.ui.settings.SettingsScreen
 import com.ris.imagedistributor.ui.setup.SetupScreen
@@ -124,10 +123,8 @@ private fun MainAppPlaceholder(container: AppContainer) {
     ) { padding ->
         when (selectedTab) {
             0 -> {
-                val imageLibraryViewModel: ImageLibraryViewModel =
-                    viewModel(factory = ImageLibraryViewModel.factory(container))
                 Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-                    ImageLibraryScreen(viewModel = imageLibraryViewModel)
+                    ImagesTab(container = container)
                 }
             }
             1 -> {

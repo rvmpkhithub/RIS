@@ -28,8 +28,8 @@ class DashboardScreenTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
-    private val receiverA = Receiver(id = 1L, name = "Asha", channel = "WHATSAPP", phoneOrEmail = "+911234567890", minCount = 2, maxCount = 5)
-    private val receiverB = Receiver(id = 2L, name = "Bala", channel = "EMAIL", phoneOrEmail = "bala@example.com", minCount = 2, maxCount = 5)
+    private val receiverA = Receiver(id = 1L, name = "Asha", channel = "WHATSAPP", phoneOrEmail = "+911234567890")
+    private val receiverB = Receiver(id = 2L, name = "Bala", channel = "EMAIL", phoneOrEmail = "bala@example.com")
     private val image = Image(id = 9L, filePath = "a.jpg", active = true, uploadedAt = 0L)
 
     private fun containerWith(receivers: List<ReceiverWithSchedules>, historyByReceiver: Map<Long, List<DeliveryRecord>>): AppContainer {

@@ -13,4 +13,6 @@ data class Image(
     val filePath: String,
     val active: Boolean = true,
     val uploadedAt: Long,
+    val title: String? = null,
+    val description: String? = null,
 )

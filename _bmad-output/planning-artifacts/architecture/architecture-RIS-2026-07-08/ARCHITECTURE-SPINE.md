@@ -185,8 +185,6 @@ erDiagram
     string name
     string channel
     string phoneOrEmail
-    int minCount
-    int maxCount
   }
   RECEIVER_SCHEDULE {
     long id
@@ -201,6 +199,8 @@ erDiagram
     long id
     string filePath
     bool active
+    string title
+    string description
   }
   TRANSMISSION {
     long id

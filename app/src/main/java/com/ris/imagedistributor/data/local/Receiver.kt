@@ -17,8 +17,6 @@ data class Receiver(
     val name: String,
     val channel: String,
     val phoneOrEmail: String,
-    val minCount: Int,
-    val maxCount: Int,
 )
 
 /** Combined shape the repository/UI work with — a receiver plus its (ordered) schedule times. */

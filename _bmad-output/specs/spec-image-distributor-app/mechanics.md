@@ -6,11 +6,10 @@ Supporting detail for CAP-3, CAP-4, CAP-6, CAP-7. This is the HOW behind those c
 
 For each receiver, at each scheduled send:
 
-1. Pick a random count Z between that receiver's configured min X and max Y (inclusive). Z is re-rolled independently at every send — it is not fixed across days.
-2. Build the eligible pool: all currently-active images for that receiver, excluding any image sent to that same receiver within the last 7 days (checked against the transmission ledger, not a separate dedupe table).
-3. If the eligible pool has at least Z images, pick Z at random from it — no duplicates within the batch.
-4. If the eligible pool has fewer than Z images (the 7-day exclusion made the math impossible), fall back to allowing repeats: pick from all active images regardless of the 7-day rule until Z is reached.
-5. If the total active image count is itself less than Z (independent of the repeat rule), send only however many active images exist. Do not duplicate or "top up" to reach Z.
+1. Build the eligible pool: all currently-active images for that receiver, excluding any image sent to that same receiver within the last 7 days (checked against the transmission ledger, not a separate dedupe table).
+2. If the eligible pool has at least 1 image, pick 1 at random from it.
+3. If the eligible pool is empty (the 7-day exclusion excluded every active image), fall back to allowing a repeat: pick 1 at random from all active images regardless of the 7-day rule.
+4. If there are zero active images at all (independent of the repeat rule), send nothing for that scheduled slot — no error, no retry-as-failure, simply nothing to select. **[Amended 2026-07-13 — image selection simplified from a random min/max batch to exactly one image per scheduled send]**
 
 ## Compliance flow (CAP-6, CAP-7)
 
@@ -55,8 +54,8 @@ For each receiver, at each scheduled send:
 | Compliance API returns explicit non-compliant | Halt all sending immediately; show "contact admin" message |
 | Compliance API unreachable / times out | Do not halt; retry at next scheduled check; keep sending in the meantime |
 | Tablet offline through an entire scheduled send window | On reconnect, resume only that day's batch; do not backfill prior missed days |
-| Active image pool smaller than the chosen count Z | Send only the available active images; no duplicates, no topping up |
-| 7-day no-repeat pool exhausted (not enough unsent-in-7-days images to reach Z) | Allow repeats as a fallback, still capped at the active image count |
+| Zero active images available at a scheduled send | Send nothing for that slot; no error surfaced |
+| 7-day no-repeat pool exhausted (no unsent-in-7-days image available) | Allow a repeat as a fallback, picked from all active images |
 | Image flagged inactive after being selected/queued but before the queue fires | Still sent as queued; inactive only blocks future selection |
 | Receiver has no schedule of its own | Use the master schedule's times for that receiver's scheduled-send checks |
 | Transmission to a receiver fails (any reason) | Retry up to 3 times; receiver's number correctness is the operator's own responsibility |

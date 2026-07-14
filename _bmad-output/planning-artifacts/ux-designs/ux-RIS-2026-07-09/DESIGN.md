@@ -46,9 +46,11 @@ components:
     background: '{colors.surface-variant}'
     text-color: '{colors.on-surface}'
     accent: none
-  image-grid-item:
+  image-list-item:
     corner: '{rounded.sm}'
-    inactive-treatment: 'desaturated + 60% opacity overlay, no red X'
+    divider: '{colors.outline}'
+  image-detail-view:
+    corner: none
   receiver-row:
     corner: '{rounded.md}'
     divider: '{colors.outline}'
@@ -96,8 +98,9 @@ Material 3 default shape scale: `{rounded.sm}` for list rows and form fields, `{
 ## Components
 
 - **Compliance halt screen** — full-screen, `{colors.surface-variant}` background, no red, no warning-triangle iconography. Centered message text ("Not compliant — contact admin") in `{typography.title}`, a single line of `{typography.body}` explanatory text below it, nothing else on screen. No retry button, no dismiss action — see EXPERIENCE.md for why.
-- **Image grid item** (Image Library screen) — square thumbnail, `{rounded.sm}` corners, active/inactive toggle as a simple switch overlaid bottom-right. Inactive images are desaturated with a 60% opacity overlay — not hidden, not marked with a red icon, just visually "dimmed out."
-- **Receiver row** (Receivers screen) — `{rounded.md}` card: name + channel icon (WhatsApp/email) on top line, schedule summary (e.g. "4×/day", or "Uses master schedule" if the receiver has none of its own) + count range as `{typography.label}` meta text below — the full list (if any) is visible/editable on the Receiver Edit screen. Tap opens edit; trailing icon-button for delete.
+- **Image list item** (Image Library screen) — `{rounded.sm}` row, no thumbnail: title (or "Untitled") in `{typography.title}` on the left, a "View" button and the active/inactive toggle on the right. Inactive rows show reduced-opacity title text (no thumbnail exists to desaturate) — not hidden, not marked with a red icon.
+- **Image detail view** (opened via "View", or automatically right after picking a single image to upload) — full-bleed image, title/description as editable fields below it (same inline-field pattern as other forms), the active/inactive toggle, and a back action. No gold-bordered card here — this screen exists to look at the photo, not to feel like a form. The upload entry point reuses this exact screen unchanged — the image is already saved to the library by the time it opens, so leaving via the back action (title/description left blank, or edited but not saved) or via "Save" are both valid ways to finish tagging or skip it.
+- **Receiver row** (Receivers screen) — `{rounded.md}` card: name + channel icon (WhatsApp/email) on top line, schedule summary (e.g. "4×/day", or "Uses master schedule" if the receiver has none of its own) as `{typography.label}` meta text below — the full list (if any) is visible/editable on the Receiver Edit screen. Tap opens edit; trailing icon-button for delete.
 - **Retention row** (Settings) — simple label-left/value-right row (current retention days), tap opens a numeric picker. No slider — a slider implies more granularity than this setting needs.
 - **Master schedule list** (Settings) — reuses the exact "Schedule time list" component from Receiver Edit (EXPERIENCE.md#Component Patterns) verbatim: same add/remove rows, same minimum-4 inline error, same time picker. Sits below the retention row on the same screen, its own labeled section ("Master schedule").
 - **Dashboard entry row** — timestamp in `{typography.label}`, image thumbnail (small, 40dp) leading, "Sent" in `{colors.success-muted}` trailing.

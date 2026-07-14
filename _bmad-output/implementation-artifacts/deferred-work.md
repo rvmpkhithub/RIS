@@ -75,3 +75,24 @@
 - The stored file extension defaults to `.jpg` on a failed/missing MIME lookup without validating actual file content. Deferred: self-assessed as "cosmetic today" since Coil sniffs by content, not extension — a latent landmine for hypothetical future extension-based logic, not a current bug.
 - `Image.filePath` has no DB index/uniqueness constraint, and `observeAll()` has no pagination. Deferred: proportionate for this app's expected scale (a personal image library); revisit if the library ever grows large enough to matter.
 - The instrumented `ImageLibraryScreenTest` only exercises the empty-state case — no grid/toggle/picker-launch coverage. Deferred: expanding Compose UI coverage for this screen is valuable but a substantial addition beyond a catch-up review's scope. This review did discover the story's own "won't execute in this sandbox" disclosure was stale — the existing test (and the rest of the instrumented suite) now runs cleanly in this environment.
+
+## Deferred from: code review of story 1-4-image-tagging-list-view (2026-07-13)
+
+- Active toggle on the Image Detail screen commits immediately to the DB while title/description edits are buffered and only committed on Save — backing out after editing text (with or without touching the toggle) silently discards the text but keeps the toggle change, with no discard-confirmation. Deferred: explicit operator decision — acceptable behavior for this internal single-operator tool, no discard-guard needed.
+- `ImageRepositoryImpl.updateImageDetails` ignores the DAO's affected-row count, so updating a since-deleted image's id reports `Success` though nothing changed. Deferred: unreachable today — the app has no image-delete feature yet, so an image id can't go stale (same class of issue already deferred in Story 1.2's review for `setActive`).
+- A stale in-flight save callback race: pressing back mid-save on the Image Detail screen and re-entering Detail before the stale `onResult` fires can force an unexpected route change back to List. Deferred: narrow timing window, no currently-exercised path.
+- Blank-to-`null` trimming for image title/description is enforced only in `ImageRepositoryImpl`, not at the `ImageDao`/entity boundary. Deferred: single call site today, matches this codebase's existing single-layer-normalization convention (compare `ReceiverEditScreen`'s equivalent UI-layer-only trimming).
+- `ImageLibraryViewModel`'s shared `_isSaving` flag now spans both the Image Library (list) and Image Detail screens. Deferred: no cross-screen conflict is reachable today since only the Detail screen currently drives it.
+
+## Deferred from: code review of story 2-4-single-image-selection (2026-07-13)
+
+- A receiver with no schedule of its own AND an empty/unconfigured master schedule shows "Uses master schedule" in the Receivers list with no warning that it will never actually receive anything — the existing `isNotEmpty() && size < MIN_SCHEDULE_TIMES` warning condition doesn't catch this combination. Deferred: pre-existing, out of scope for this story — Story 2.4's diff only removed the image-count-range text suffix from the row; the warning condition itself is unchanged code from Story 2.3.
+
+## Deferred from: code review of story 2-3-master-schedule-fallback (2026-07-13)
+
+- `MIN_SCHEDULE_TIMES` (value `4`) is duplicated across three files — `ReceiverEditScreen.kt`, `SettingsScreen.kt` (as `MIN_MASTER_SCHEDULE_TIMES`), and `MasterScheduleRepositoryImpl.kt`. Deferred: each site's doc comment explains this is intentional (a data-layer class must not depend on a UI-layer constant), consistent with this codebase's established layering discipline — but it remains a manual-sync risk if the value ever changes, worth a shared-constants-file pass if it ever does.
+
+## Deferred from: code review of story 1-5-tag-on-upload (2026-07-13)
+
+- A device rotation in the narrow window between a successful upload and the Room `images` Flow's re-emission of the new row drops `ImagesRoute.Detail.preloaded`, falls through to `images.find` (which hasn't caught up), and silently bounces to List even though the upload succeeded (`hasLoaded` is already `true`, so `ImageDetailScreen` treats it as "not found" rather than "still loading"). Deferred: sub-second window, no data loss (image is safely persisted, only that session's immediate tagging opportunity is lost — recoverable via "View"), consistent with this codebase's tolerance for similarly narrow, non-data-losing races.
+- `ImagesTab.kt`'s actual routing behavior (upload → Detail navigation, `BackHandler`, the `preloaded` fallback) has no automated Compose UI test — only `ImagesRouteSaverTest`'s pure string-serialization tests exist. Deferred: directly and thoroughly live-verified in this story's own Task 6 instead; a Compose UI test would need to mock `ActivityResultLauncher` picker results, which is awkward to author — a future improvement, not a blocking gap.

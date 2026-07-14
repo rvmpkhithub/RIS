@@ -15,6 +15,8 @@ import com.ris.imagedistributor.data.repository.DeliveryRepository
 import com.ris.imagedistributor.data.repository.DeliveryRepositoryImpl
 import com.ris.imagedistributor.data.repository.ImageRepository
 import com.ris.imagedistributor.data.repository.ImageRepositoryImpl
+import com.ris.imagedistributor.data.repository.MasterScheduleRepository
+import com.ris.imagedistributor.data.repository.MasterScheduleRepositoryImpl
 import com.ris.imagedistributor.data.repository.ReceiverRepository
 import com.ris.imagedistributor.data.repository.ReceiverRepositoryImpl
 import com.ris.imagedistributor.data.repository.RetentionRepository
@@ -73,6 +75,9 @@ class AppContainer(context: Context) {
                 AppDatabase.MIGRATION_4_5,
                 AppDatabase.MIGRATION_5_6,
                 AppDatabase.MIGRATION_6_7,
+                AppDatabase.MIGRATION_7_8,
+                AppDatabase.MIGRATION_8_9,
+                AppDatabase.MIGRATION_9_10,
             )
             .build()
     }
@@ -115,6 +120,10 @@ class AppContainer(context: Context) {
         RetentionRepositoryImpl(dao = database.retentionSettingDao())
     }
 
+    val masterScheduleRepository: MasterScheduleRepository by lazy {
+        MasterScheduleRepositoryImpl(database = database)
+    }
+
     val imageSelectionEngine: ImageSelectionEngine by lazy {
         ImageSelectionEngine(imageRepository, transmissionRepository)
     }
@@ -138,6 +147,7 @@ class AppContainer(context: Context) {
             deliveryRepository = deliveryRepository,
             complianceRepository = complianceRepository,
             complianceGate = complianceGate,
+            masterScheduleRepository = masterScheduleRepository,
         )
     }
 

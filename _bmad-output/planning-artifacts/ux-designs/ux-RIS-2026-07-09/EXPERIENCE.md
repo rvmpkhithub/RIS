@@ -23,9 +23,10 @@ Android, Jetpack Compose, Material 3 defaults (no custom UI system). `DESIGN.md`
 |---|---|---|
 | Setup (first-run) | Cold launch, before registration exists | Collect name/city once; trigger registration + first compliance check |
 | Compliance Halt | Setup, or any subsequent launch/background check that returns explicit non-compliant | Dead-end: app is not usable, contact admin |
-| Image Library | Bottom nav | Upload images; toggle active/inactive |
+| Image Library | Bottom nav | Upload one image at a time (prompts for an optional title/description immediately after picking); browse as a titled list; toggle active/inactive |
+| Image Detail | Image Library row's "View" button | View the full image; edit its title/description; toggle active/inactive |
 | Receivers | Bottom nav | List, add, edit, remove receivers |
-| Receiver Edit | Receivers row tap, or "+" | One receiver's fields: name, channel, contact, count range, schedule times (optional; if any are given, minimum 4 — falls back to the master schedule if left empty) |
+| Receiver Edit | Receivers row tap, or "+" | One receiver's fields: name, channel, contact, schedule times (optional; if any are given, minimum 4 — falls back to the master schedule if left empty) |
 | Dashboard | Bottom nav | Per-receiver timestamped send history, 30+ days |
 | Settings | Bottom nav | Retention-period control (Story 3.2) and the master schedule (Story 2.3) — the app-wide default schedule times used by any receiver with none of its own |
 
@@ -50,7 +51,8 @@ Behavioral; visual specs live in `DESIGN.md.Components`.
 
 | Component | Use | Behavioral rules |
 |---|---|---|
-| Image grid item | Image Library | Tap toggles active/inactive directly on the grid (no separate edit screen) — matches Story 1.2's "toggle to inactive" being the entire interaction. |
+| Image list item | Image Library | Shows title (or "Untitled") + a "View" button + the active/inactive toggle — tapping the toggle still flips active/inactive directly from the list, same one-tap interaction Story 1.2 established; tapping "View" opens Image Detail instead. |
+| Image detail view | Image Library row's "View" button | Full-screen image with title/description as editable inline fields (saved on change, not a modal) and the active/inactive toggle repeated here for convenience; back returns to the list. |
 | Receiver row | Receivers list | Tap → Receiver Edit. Swipe-to-delete (native pattern) with a confirm dialog — deletion is destructive and not undoable, per no persistence rule for removed receivers. |
 | Receiver Edit form | Receivers | Channel choice (WhatsApp/email) is a segmented control at the top; it changes which contact field shows below (phone vs. email) — never show both fields at once. |
 | Schedule time list | Receiver Edit, Settings (master schedule) | A receiver's own schedule is optional — zero times is valid and means "use the master schedule." If the operator adds any, the same minimum of 4 applies. Each time is its own row with an add/remove control; "Add time" opens the same time picker used elsewhere. Save is blocked with the same inline error ("Add at least 4 schedule times.") only when the list is *partially* filled (1–3 times) — an empty list is not an error. The master schedule in Settings reuses this exact component, except it can never be emptied below 4 once seeded (there's no receiver to "fall back," so Settings enforces the minimum unconditionally). |
@@ -85,7 +87,7 @@ Behavioral; visual contrast lives in `DESIGN.md`.
 
 - TalkBack: every interactive element labeled with role + state; the Compliance Halt screen's message is announced in full automatically on screen entry (this is the one screen where a user with no other context must understand what's happening from audio alone).
 - Dynamic type honored through `DESIGN.md` typography tokens; no truncated labels at largest system text size — receiver rows and dashboard rows must wrap, not clip.
-- Tap targets ≥ 48dp (Android standard), including the image-grid active/inactive toggle.
+- Tap targets ≥ 48dp (Android standard), including the image list row's active/inactive toggle and its "View" button.
 - Focus traversal follows visual reading order on every screen; the Receiver Edit form's channel-based field-swap does not break focus order when the visible field changes.
 
 ## Key Flows
@@ -97,7 +99,7 @@ Behavioral; visual contrast lives in `DESIGN.md`.
 3. He enters them and taps Continue — this is a one-time, permanent choice (no edit path exists after this point, per CAP-6).
 4. The app registers the install and checks compliance live.
 5. Compliant → he lands on Image Library, empty.
-6. He uploads his first batch of images, then switches to Receivers and adds his first customer (name, WhatsApp number, a 3-6 daily image range, a 9am schedule).
+6. He uploads his first few images one at a time, tagging each with a short title as he goes, then switches to Receivers and adds his first customer (name, WhatsApp number, a 9am schedule).
 7. **Climax:** he adds his last regular customer, backs out to Dashboard — empty, nothing sent yet — and closes the app. Tomorrow morning, it runs itself for the first time without him touching it again.
 
 Failure path: if step 4 returns explicit non-compliant, Arjun never reaches Image Library at all — he sees Compliance Halt immediately and has no path forward except contacting the admin (outside the app).

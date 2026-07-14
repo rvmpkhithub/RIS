@@ -211,16 +211,21 @@ private fun ReceiverRow(entry: ReceiverWithSchedules, viewModel: ReceiversViewMo
                     val channelLabel = if (receiver.channelOrDefault() == ReceiverChannel.WHATSAPP) "WhatsApp" else "Email"
                     Text(text = "${receiver.name} · $channelLabel", style = MaterialTheme.typography.titleMedium)
                     // DESIGN.md#Components — receiver-row shows a schedule-count summary, not
-                    // the full time list (that lives on the Edit screen).
+                    // the full time list (that lives on the Edit screen). A schedule-less
+                    // receiver reads "Uses master schedule" rather than "0×/day" — [Sprint Change
+                    // Proposal 2026-07-12], since zero is now a valid, intentional state.
+                    val scheduleSummary = if (entry.scheduleTimes.isEmpty()) "Uses master schedule" else "${entry.scheduleTimes.size}×/day"
                     Text(
-                        text = "${entry.scheduleTimes.size}×/day · %d–%d images".format(receiver.minCount, receiver.maxCount),
+                        text = scheduleSummary,
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.padding(top = 4.dp),
                     )
                     // [Review][Patch] a receiver migrated from the old single-schedule model (or
                     // otherwise left below the minimum) is otherwise invisible in the list — flag
-                    // it so the operator knows to open Edit and add more times.
-                    if (entry.scheduleTimes.size < MIN_SCHEDULE_TIMES) {
+                    // it so the operator knows to open Edit and add more times. A genuinely empty
+                    // schedule is valid (falls back to the master schedule) and must not trigger
+                    // this warning — only a partially filled list (1-3 times) does.
+                    if (entry.scheduleTimes.isNotEmpty() && entry.scheduleTimes.size < MIN_SCHEDULE_TIMES) {
                         Text(
                             text = "Needs ${MIN_SCHEDULE_TIMES - entry.scheduleTimes.size} more schedule time(s)",
                             style = MaterialTheme.typography.labelMedium,

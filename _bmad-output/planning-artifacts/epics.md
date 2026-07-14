@@ -13,9 +13,9 @@ This document provides the complete epic and story breakdown for the scheduled i
 
 ### Functional Requirements
 
-FR1: Operator can upload a library of images and flag each one active or inactive. (CAP-1)
-FR2: Operator can configure up to ~10 receivers, each with a name, +91 mobile number, a delivery channel (WhatsApp or email), a per-receiver min/max image count (drawn fresh at each send), and one or more daily send schedule times (minimum 4). (CAP-2)
-FR3: At each scheduled send, the system picks a random image count within that receiver's min/max and selects that many active images, avoiding any image already sent to that receiver in the last 7 days unless the eligible pool can't cover the count. (CAP-3)
+FR1: Operator can upload a library of images, tag each with an optional title and short description, and flag each one active or inactive. (CAP-1)
+FR2: Operator can configure up to ~10 receivers, each with a name, +91 mobile number, a delivery channel (WhatsApp or email), and one or more daily send schedule times (minimum 4). (CAP-2)
+FR3: At each scheduled send, the system selects exactly one active image, avoiding any image already sent to that receiver in the last 7 days unless the eligible pool is exhausted. (CAP-3)
 FR4: Selected sends are queued by image ID (not image data) and delivered over the receiver's channel; failed deliveries retry automatically (up to 3 times) and resume once connectivity returns. If offline through an entire scheduled window, only that day's batch resends on reconnect — no backfill of earlier missed days. (CAP-4)
 FR5: Operator can view, per receiver, a log of what was sent and when, covering at least the last 30 days, sufficient to resolve delivery disputes. (CAP-5)
 FR6: On first launch, the app collects the installer's first name/nickname and city once, locks them permanently, and registers the install with an external admin system. (CAP-6)
@@ -125,23 +125,67 @@ So that I control exactly what can be sent.
 ### Story 1.3: Receiver Configuration
 
 As the operator,
-I want to add and manage receivers with their contact details, delivery channel, per-receiver image-count range, and optionally their own daily schedule times,
+I want to add and manage receivers with their contact details, delivery channel, and optionally their own daily schedule times,
 So that each receiver gets exactly the distribution I've set up for them.
 
 **Acceptance Criteria:**
 
 **Given** I'm on the receivers screen
-**When** I add a new receiver with a name, a +91 phone number (for WhatsApp) or an email address (for email), a min/max daily image count, and *optionally* one or more daily schedule times (if any are given, minimum 4)
+**When** I add a new receiver with a name, a +91 phone number (for WhatsApp) or an email address (for email), and *optionally* one or more daily schedule times (if any are given, minimum 4)
 **Then** the receiver is saved and appears in my receiver list
 
 **Given** a receiver exists
 **When** I edit or remove it
 **Then** the change is saved and takes effect from the next scheduled send onward
-**And** changing one receiver's settings never affects another receiver's schedule, channel, or count range
+**And** changing one receiver's settings never affects another receiver's schedule or channel
 
 **Given** a receiver has no schedule times of its own
 **When** the app checks for a scheduled send
 **Then** it uses the app-wide master schedule instead (Story 2.3)
+
+### Story 1.4: Image Tagging & List View
+
+As the operator,
+I want to give each image an optional title and short description, and browse my library as a titled list instead of a thumbnail grid,
+So that I can identify images by what they are, not just by their appearance in a small square.
+
+**Acceptance Criteria:**
+
+**Given** I'm viewing an image in my library
+**When** I open it
+**Then** I see a full-screen view of the image, its title and description fields, and the active/inactive toggle, with a way to edit and save the title/description
+
+**Given** an image has a title
+**When** I view the image library list
+**Then** I see its title (or "Untitled" if none is set) and a "View" button, not a thumbnail
+
+**Given** I tap "View" on an image's list row
+**When** the detail view opens
+**Then** it shows the full image with its title/description editable in place
+
+**Technical note:** this story revisits Story 1.2's shipped `Image` entity (adds nullable `title`/`description` columns, an additive migration) and Image Library screen (replaces the thumbnail grid with a titled list + View button); the active/inactive toggle itself is unchanged in behavior, just relocated into the list row and/or detail view.
+
+### Story 1.5: Tag-on-Upload
+
+As the operator,
+I want to add one image at a time and be prompted to tag it immediately after picking it,
+So that I don't have to upload first and separately hunt for it later just to add a title/description.
+
+**Acceptance Criteria:**
+
+**Given** I tap "Upload images"
+**When** the photo picker opens
+**Then** I can select only one image (not multiple) — a single-select picker, not the current multi-select one
+
+**Given** I've picked one image
+**When** it's copied into the library
+**Then** I'm immediately shown a screen to enter an optional title and description for that image, before returning to the list
+
+**Given** I leave the title/description blank at upload time (or skip past them)
+**When** I later view the image via the existing "View" button on its list row
+**Then** it still shows as "Untitled" and can be tagged at any time via the existing Image Detail flow (unchanged) — this story does not remove or alter that path, only adds an earlier opportunity to tag
+
+**Technical note:** this story revisits Story 1.4's shipped Image Library screen (`ImageLibraryScreen.kt` — replaces `ActivityResultContracts.PickMultipleVisualMedia()` with the single-select `PickVisualMedia()` contract) and reuses the existing `ImageDetailScreen`/`ImageLibraryViewModel.updateImageDetails` flow immediately after a successful `uploadImages` call, rather than requiring a separate List → View round trip. Does not change `ImageFileStore`, the `Image` entity/schema, or the active/inactive toggle's behavior.
 
 ## Epic 2: Automated Daily Distribution
 
@@ -156,17 +200,16 @@ So that my daily manual sending job is replaced without receivers noticing obvio
 **Acceptance Criteria:**
 
 **Given** a receiver's scheduled send time has arrived
-**When** the app selects images for that receiver
-**Then** it picks a random count between that receiver's configured min and max
-**And** it selects that many currently-active images, excluding any image sent to that receiver in the last 7 days
+**When** the app selects an image for that receiver
+**Then** it selects exactly one currently-active image, excluding any image sent to that receiver in the last 7 days
 
-**Given** the 7-day-exclusion pool is smaller than the needed count
-**When** the app can't reach the needed count without repeating
-**Then** it falls back to allowing repeats until the count is reached
+**Given** the 7-day-exclusion pool is empty (every active image was already sent to this receiver within 7 days)
+**When** the app can't find an unsent image
+**Then** it falls back to allowing a repeat, picked from all active images
 
-**Given** the total active image count is itself smaller than the needed count
-**When** the app selects images
-**Then** it sends only the available active images — no duplicates, no topping up
+**Given** there are zero active images at all
+**When** the app attempts to select an image
+**Then** it sends nothing for that scheduled slot — no error, no retry
 
 **Technical note:** this story introduces the `Transmission` entity/DAO (needed to query the 7-day exclusion window); Story 2.2 extends it by writing rows as sends are attempted. This is a normal build-on-previous-story sequence, not a forward dependency.
 
@@ -211,6 +254,28 @@ So that I'm not forced to configure a schedule for every single receiver.
 **Then** it takes effect from the next scheduled-send check onward, for every receiver still relying on it
 
 **Technical note:** depends on Story 1.3's schedule becoming optional and Story 2.2's `SendDispatcher` (extends its dispatch loop with a fallback branch); no changes to the queue/retry/offline-recovery logic those stories already established.
+
+### Story 2.4: Single-Image Selection
+
+As the operator,
+I want each scheduled send to deliver exactly one image instead of a random batch,
+So that receivers get a single image per occurrence and I no longer need to configure a min/max count per receiver.
+
+**Acceptance Criteria:**
+
+**Given** a receiver's scheduled send time has arrived
+**When** the app selects an image for that receiver
+**Then** it selects exactly one currently-active image, excluding any image already sent to that receiver in the last 7 days, falling back to a repeat only if every active image has already been sent within that window, and sending nothing if there are no active images at all
+
+**Given** I'm adding or editing a receiver
+**When** I view the receiver form
+**Then** there is no min/max image count field — only contact details, channel, and optional schedule times
+
+**Given** a receiver configured before this story shipped (with an existing min/max count)
+**When** the app upgrades
+**Then** the min/max count is dropped entirely from storage — no data migration path preserves it, since it no longer has any purpose
+
+**Technical note:** this story revisits Story 1.3's shipped `Receiver` entity/form (drops `minCount`/`maxCount` — a destructive-but-intentional schema change using the same copy-and-rename migration pattern already used once before in `MIGRATION_3_4`) and Story 2.1's shipped `ImageSelectionEngine` (removes the random-count-Z logic, always selects exactly 1).
 
 ## Epic 3: Delivery Proof & Data Housekeeping
 

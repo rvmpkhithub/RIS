@@ -29,7 +29,6 @@ class ImageRepositoryImplTest {
     private lateinit var repository: ImageRepositoryImpl
 
     private val uri1: Uri = mockk()
-    private val uri2: Uri = mockk()
 
     @Before
     fun setUp() {
@@ -39,69 +38,47 @@ class ImageRepositoryImplTest {
     }
 
     @Test
-    fun `uploadImages copies then inserts each image in order, never inserting before its copy succeeds`() = runTest {
+    fun `uploadImage copies then inserts, returning the new row's id`() = runTest {
         coEvery { fileStore.copyToAppStorage(uri1) } returns "a.jpg"
-        coEvery { fileStore.copyToAppStorage(uri2) } returns "b.jpg"
-        coEvery { dao.insert(any()) } returns 1L
+        coEvery { dao.insert(any()) } returns 7L
 
-        val result = repository.uploadImages(listOf(uri1, uri2))
+        val result = repository.uploadImage(uri1)
 
-        assertTrue(result is AppResult.Success)
+        assertEquals(AppResult.Success(7L), result)
         coVerifyOrder {
             fileStore.copyToAppStorage(uri1)
             dao.insert(match { it.filePath == "a.jpg" && it.active })
-            fileStore.copyToAppStorage(uri2)
-            dao.insert(match { it.filePath == "b.jpg" && it.active })
         }
     }
 
     @Test
-    fun `uploadImages failure on the file copy maps to FILE_ERROR and does not insert a dangling row`() = runTest {
+    fun `uploadImage failure on the file copy maps to FILE_ERROR and does not insert a dangling row`() = runTest {
         coEvery { fileStore.copyToAppStorage(uri1) } throws IOException("disk full")
 
-        val result = repository.uploadImages(listOf(uri1))
+        val result = repository.uploadImage(uri1)
 
         assertEquals(AppResult.Failure(FailureReason.FILE_ERROR), result)
         coVerify(exactly = 0) { dao.insert(any()) }
     }
 
     @Test
-    fun `uploadImages failure on the DB insert maps to DATABASE_ERROR and deletes the just-copied file`() = runTest {
+    fun `uploadImage failure on the DB insert maps to DATABASE_ERROR and deletes the just-copied file`() = runTest {
         coEvery { fileStore.copyToAppStorage(uri1) } returns "a.jpg"
         coEvery { dao.insert(any()) } throws RuntimeException("boom")
         every { fileStore.delete(any()) } just Runs
 
-        val result = repository.uploadImages(listOf(uri1))
+        val result = repository.uploadImage(uri1)
 
         assertEquals(AppResult.Failure(FailureReason.DATABASE_ERROR), result)
         coVerify { fileStore.delete("a.jpg") }
     }
 
-    // [Review][Patch] regression test for the all-or-nothing batch bug — a failure partway
-    // through a multi-image upload used to silently abandon the remaining uris (never attempted)
-    // while still keeping whatever had already persisted, yet reported the whole call as Failure.
     @Test
-    fun `uploadImages attempts every uri even after an earlier one fails, and still reports the overall failure`() = runTest {
-        val uri3: Uri = mockk()
-        coEvery { fileStore.copyToAppStorage(uri1) } returns "a.jpg"
-        coEvery { fileStore.copyToAppStorage(uri2) } throws IOException("bad file")
-        coEvery { fileStore.copyToAppStorage(uri3) } returns "c.jpg"
-        coEvery { dao.insert(any()) } returns 1L
-
-        val result = repository.uploadImages(listOf(uri1, uri2, uri3))
-
-        assertEquals(AppResult.Failure(FailureReason.FILE_ERROR), result)
-        coVerify { dao.insert(match { it.filePath == "a.jpg" }) }
-        coVerify { fileStore.copyToAppStorage(uri3) } // still attempted despite uri2's failure
-        coVerify { dao.insert(match { it.filePath == "c.jpg" }) }
-    }
-
-    @Test
-    fun `uploadImages does not swallow CancellationException`() = runTest {
+    fun `uploadImage does not swallow CancellationException`() = runTest {
         coEvery { fileStore.copyToAppStorage(uri1) } throws CancellationException("cancelled")
 
         try {
-            repository.uploadImages(listOf(uri1))
+            repository.uploadImage(uri1)
             org.junit.Assert.fail("expected CancellationException to propagate")
         } catch (e: CancellationException) {
             // expected
@@ -178,5 +155,36 @@ class ImageRepositoryImplTest {
         every { fileStore.absolutePath("a.jpg") } returns expected
 
         assertEquals(expected, repository.resolveFile("a.jpg"))
+    }
+
+    @Test
+    fun `updateImageDetails delegates to the dao with the given title and description`() = runTest {
+        val result = repository.updateImageDetails(id = 5L, title = "Sunset", description = "A nice sunset")
+
+        assertTrue(result is AppResult.Success)
+        coVerify { dao.updateDetails(5L, "Sunset", "A nice sunset") }
+    }
+
+    @Test
+    fun `updateImageDetails DB failure maps to DATABASE_ERROR`() = runTest {
+        coEvery { dao.updateDetails(any(), any(), any()) } throws RuntimeException("boom")
+
+        val result = repository.updateImageDetails(id = 5L, title = "Sunset", description = null)
+
+        assertEquals(AppResult.Failure(FailureReason.DATABASE_ERROR), result)
+    }
+
+    @Test
+    fun `updateImageDetails trims blank title and description to null`() = runTest {
+        repository.updateImageDetails(id = 5L, title = "   ", description = "")
+
+        coVerify { dao.updateDetails(5L, null, null) }
+    }
+
+    @Test
+    fun `updateImageDetails trims surrounding whitespace from non-blank values`() = runTest {
+        repository.updateImageDetails(id = 5L, title = "  Sunset  ", description = "  A nice sunset  ")
+
+        coVerify { dao.updateDetails(5L, "Sunset", "A nice sunset") }
     }
 }

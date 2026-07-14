@@ -31,8 +31,6 @@ class ReceiverRepositoryImplTest {
         name = "Asha",
         channel = "WHATSAPP",
         phoneOrEmail = "+911234567890",
-        minCount = 2,
-        maxCount = 5,
     )
     private val scheduleTimes = listOf(9 * 60, 12 * 60, 15 * 60, 18 * 60)
 

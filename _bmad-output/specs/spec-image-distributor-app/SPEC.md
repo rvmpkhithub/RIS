@@ -15,16 +15,16 @@ The operator (a friend of the requester) runs a business where 8-10 paying custo
 ## Capabilities
 
 - **CAP-1**
-  - **intent:** Operator can upload a library of images and flag each one active or inactive.
-  - **success:** An image flagged inactive is never selected for a future send; reactivating it makes it selectable again.
+  - **intent:** Operator uploads images one at a time; each upload prompts for an optional title and short description before the image is added to the library. Each image can be flagged active or inactive.
+  - **success:** An image flagged inactive is never selected for a future send; reactivating it makes it selectable again. Title/description are freely editable at any time (including after upload, via the image's detail view) and never affect selection or delivery — purely descriptive metadata for the operator's own reference.
 
 - **CAP-2**
-  - **intent:** Operator can configure up to ~10 receivers, each with a name, +91 mobile number, a delivery channel (WhatsApp or email), a per-receiver minimum/maximum image count (drawn fresh at each send), and *optionally* one or more daily send schedule times — if any are given, minimum 4. A receiver with no schedule of its own falls back to the app-wide master schedule (also minimum 4 times, configured once in Settings).
-  - **success:** Each receiver sends according to its own schedule times (or the master schedule, if it has none), channel, and count range — changing one receiver's settings never affects another's, and changing the master schedule only affects receivers that don't have their own.
+  - **intent:** Operator can configure up to ~10 receivers, each with a name, +91 mobile number, a delivery channel (WhatsApp or email), and *optionally* one or more daily send schedule times — if any are given, minimum 4. A receiver with no schedule of its own falls back to the app-wide master schedule (also minimum 4 times, configured once in Settings). Each scheduled time sends exactly one image (see CAP-3) — a receiver's daily image count is simply the number of times it's scheduled to send.
+  - **success:** Each receiver sends according to its own schedule times (or the master schedule, if it has none) and channel — changing one receiver's settings never affects another's, and changing the master schedule only affects receivers that don't have their own.
 
 - **CAP-3**
-  - **intent:** At each scheduled send, the system picks a random image count within that receiver's min/max, then selects that many active images for the receiver, avoiding any image already sent to that receiver in the last 7 days unless the eligible pool can't cover the count (see `mechanics.md`).
-  - **success:** Two different scheduled sends to the same receiver produce different counts and different image sets; no receiver receives an image already sent to them within the prior 7 days, except when the active-and-unsent pool is smaller than the count needed, in which case a repeat is allowed.
+  - **intent:** At each scheduled send, the system selects exactly one active image for the receiver, avoiding any image already sent to that receiver in the last 7 days unless the eligible pool is exhausted (see `mechanics.md`).
+  - **success:** Two different scheduled sends to the same receiver produce different images; no receiver receives an image already sent to them within the prior 7 days, except when every active image has already been sent to them within that window, in which case a repeat is allowed. If the operator has no active images at all, that scheduled slot simply sends nothing.
 
 - **CAP-4**
   - **intent:** Selected sends are queued by image ID (not image data) and delivered over the receiver's channel; failed deliveries retry automatically and resume once connectivity returns.

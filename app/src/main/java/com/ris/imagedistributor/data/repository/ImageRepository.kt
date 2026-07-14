@@ -12,7 +12,9 @@ import java.io.File
  */
 interface ImageRepository {
     fun observeImages(): Flow<List<Image>>
-    suspend fun uploadImages(uris: List<Uri>): AppResult<Unit>
+
+    /** Copies the picked image into app storage and inserts it, returning the new row's id. */
+    suspend fun uploadImage(uri: Uri): AppResult<Long>
     suspend fun setActive(id: Long, active: Boolean): AppResult<Unit>
 
     /** One-shot snapshot of currently-active images, for ImageSelectionEngine (Story 2.1). */
@@ -23,4 +25,7 @@ interface ImageRepository {
 
     /** Resolves a stored relative filePath to a loadable File — the only path math the UI needs. */
     fun resolveFile(filePath: String): File
+
+    /** Updates an image's title/description (Story 1.4) — blank strings are normalized to null. */
+    suspend fun updateImageDetails(id: Long, title: String?, description: String?): AppResult<Unit>
 }

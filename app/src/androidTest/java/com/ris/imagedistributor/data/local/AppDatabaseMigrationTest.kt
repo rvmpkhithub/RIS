@@ -143,12 +143,94 @@ class AppDatabaseMigrationTest {
     }
 
     @Test
-    fun migrate1Through7_succeedsAgainstAFreshV1Database() {
+    fun migrate7To8_createsMasterScheduleTableWithFourSeededRows() {
+        helper.createDatabase(TEST_DB, 7).close()
+
+        val db = helper.runMigrationsAndValidate(TEST_DB, 8, true, AppDatabase.MIGRATION_7_8)
+
+        val cursor = db.query("SELECT time FROM master_schedule ORDER BY time ASC")
+        assert(cursor.count == 4) { "expected exactly 4 seeded master_schedule rows" }
+        val expected = listOf(540, 720, 900, 1080)
+        var index = 0
+        while (cursor.moveToNext()) {
+            assert(cursor.getInt(cursor.getColumnIndexOrThrow("time")) == expected[index]) { "expected seeded time ${expected[index]} at row $index" }
+            index++
+        }
+        cursor.close()
+    }
+
+    @Test
+    fun migrate8To9_addsTitleAndDescriptionColumns() {
+        helper.createDatabase(TEST_DB, 8).apply {
+            execSQL(
+                "INSERT INTO images (id, filePath, active, uploadedAt) VALUES (1, 'a.jpg', 1, 1000)"
+            )
+            close()
+        }
+
+        val db = helper.runMigrationsAndValidate(TEST_DB, 9, true, AppDatabase.MIGRATION_8_9)
+
+        val cursor = db.query("SELECT title, description FROM images WHERE id = 1")
+        assert(cursor.moveToFirst()) { "expected the pre-existing row to survive the migration" }
+        assert(cursor.isNull(cursor.getColumnIndexOrThrow("title"))) { "expected title to be NULL for a pre-existing row" }
+        assert(cursor.isNull(cursor.getColumnIndexOrThrow("description"))) { "expected description to be NULL for a pre-existing row" }
+        cursor.close()
+
+        db.execSQL(
+            "INSERT INTO images (id, filePath, active, uploadedAt, title, description) " +
+                "VALUES (2, 'b.jpg', 1, 2000, 'Sunset', 'A nice sunset')"
+        )
+        val newCursor = db.query("SELECT title, description FROM images WHERE id = 2")
+        assert(newCursor.moveToFirst()) { "expected the newly inserted row to be queryable" }
+        assert(newCursor.getString(newCursor.getColumnIndexOrThrow("title")) == "Sunset")
+        assert(newCursor.getString(newCursor.getColumnIndexOrThrow("description")) == "A nice sunset")
+        newCursor.close()
+    }
+
+    @Test
+    fun migrate9To10_dropsMinMaxCountColumnsFromReceivers() {
+        helper.createDatabase(TEST_DB, 9).apply {
+            execSQL(
+                "INSERT INTO receivers (id, name, channel, phoneOrEmail, minCount, maxCount) " +
+                    "VALUES (1, 'Asha', 'WHATSAPP', '+911234567890', 2, 5)"
+            )
+            execSQL(
+                "INSERT INTO receiver_schedules (receiverId, time) VALUES (1, 540)"
+            )
+            close()
+        }
+
+        val db = helper.runMigrationsAndValidate(TEST_DB, 10, true, AppDatabase.MIGRATION_9_10)
+
+        val columnNames = db.query("SELECT * FROM receivers").columnNames.toList()
+        assert(!columnNames.contains("minCount")) { "expected minCount to be dropped, got columns $columnNames" }
+        assert(!columnNames.contains("maxCount")) { "expected maxCount to be dropped, got columns $columnNames" }
+        assert(columnNames.containsAll(listOf("id", "name", "channel", "phoneOrEmail"))) {
+            "expected id/name/channel/phoneOrEmail to survive, got columns $columnNames"
+        }
+
+        val receiverCursor = db.query("SELECT id, name, channel, phoneOrEmail FROM receivers WHERE id = 1")
+        assert(receiverCursor.moveToFirst()) { "expected the migrated receiver row to survive" }
+        assert(receiverCursor.getString(receiverCursor.getColumnIndexOrThrow("name")) == "Asha")
+        assert(receiverCursor.getString(receiverCursor.getColumnIndexOrThrow("channel")) == "WHATSAPP")
+        assert(receiverCursor.getString(receiverCursor.getColumnIndexOrThrow("phoneOrEmail")) == "+911234567890")
+        receiverCursor.close()
+
+        // receiver_schedules' FK-referenced id must still resolve correctly — the copy-and-rename
+        // preserved the same id, so this row should still be linked to the same receiver.
+        val scheduleCursor = db.query("SELECT receiverId, time FROM receiver_schedules WHERE receiverId = 1")
+        assert(scheduleCursor.moveToFirst()) { "expected the pre-existing schedule row to still resolve to receiver id 1" }
+        assert(scheduleCursor.getInt(scheduleCursor.getColumnIndexOrThrow("time")) == 540)
+        scheduleCursor.close()
+    }
+
+    @Test
+    fun migrate1Through10_succeedsAgainstAFreshV1Database() {
         helper.createDatabase(TEST_DB, 1).close()
 
         helper.runMigrationsAndValidate(
             TEST_DB,
-            7,
+            10,
             true,
             AppDatabase.MIGRATION_1_2,
             AppDatabase.MIGRATION_2_3,
@@ -156,6 +238,9 @@ class AppDatabaseMigrationTest {
             AppDatabase.MIGRATION_4_5,
             AppDatabase.MIGRATION_5_6,
             AppDatabase.MIGRATION_6_7,
+            AppDatabase.MIGRATION_7_8,
+            AppDatabase.MIGRATION_8_9,
+            AppDatabase.MIGRATION_9_10,
         )
     }
 

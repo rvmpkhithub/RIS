@@ -21,7 +21,6 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TimePickerDialog
 import androidx.compose.material3.rememberTimePickerState
@@ -40,6 +39,8 @@ import com.ris.imagedistributor.data.local.Receiver
 import com.ris.imagedistributor.data.local.ReceiverChannel
 import com.ris.imagedistributor.data.local.ReceiverWithSchedules
 import com.ris.imagedistributor.data.local.channelOrDefault
+import com.ris.imagedistributor.ui.components.ScheduleTimeListEditor
+import com.ris.imagedistributor.ui.components.addScheduleTime
 import com.ris.imagedistributor.ui.theme.GoldBorder
 
 internal const val MIN_SCHEDULE_TIMES = 4
@@ -54,10 +55,9 @@ internal const val MIN_SCHEDULE_TIMES = 4
  * edit-in-progress whose data hadn't loaded yet (or was deleted concurrently) silently fell back
  * to "add new" and inserted a duplicate on Save instead of failing or updating.
  *
- * A receiver has one or more daily schedule times, minimum 4 — [Sprint Change Proposal
- * 2026-07-10]. Each independently rolls a random image count within the receiver's min/max at
- * send time (mechanics.md's existing per-send algorithm, unchanged); this form just manages the
- * list of times.
+ * A receiver's schedule is optional — zero times is valid and falls back to the app-wide master
+ * schedule at dispatch time (Settings); if any are given, the minimum of 4 still applies —
+ * [Sprint Change Proposal 2026-07-12].
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -100,8 +100,6 @@ fun ReceiverEditScreen(
     var email by remember {
         mutableStateOf(existingReceiver?.takeIf { existingChannel == ReceiverChannel.EMAIL }?.phoneOrEmail ?: "")
     }
-    var minCountText by remember { mutableStateOf(existingReceiver?.minCount?.toString() ?: "") }
-    var maxCountText by remember { mutableStateOf(existingReceiver?.maxCount?.toString() ?: "") }
     val scheduleTimes = remember { mutableStateListOf<Int>().apply { addAll(existing?.scheduleTimes.orEmpty()) } }
     var showTimePicker by remember { mutableStateOf(false) }
 
@@ -109,7 +107,6 @@ fun ReceiverEditScreen(
     // Patterns specifies inline error text under the field, not one shared message.
     var nameError by remember { mutableStateOf<String?>(null) }
     var contactError by remember { mutableStateOf<String?>(null) }
-    var countError by remember { mutableStateOf<String?>(null) }
     var scheduleError by remember { mutableStateOf<String?>(null) }
     var saveError by remember { mutableStateOf<String?>(null) }
     // [Review][Patch] picking a time already in the list used to silently no-op — this surfaces
@@ -126,13 +123,7 @@ fun ReceiverEditScreen(
             confirmButton = {
                 Button(onClick = {
                     val newTime = timeState.hour * 60 + timeState.minute
-                    if (newTime in scheduleTimes) {
-                        duplicateTimeMessage = true
-                    } else {
-                        scheduleTimes.add(newTime)
-                        scheduleTimes.sort()
-                        duplicateTimeMessage = false
-                    }
+                    duplicateTimeMessage = !addScheduleTime(scheduleTimes, newTime)
                     showTimePicker = false
                 }) { Text("OK") }
             },
@@ -209,56 +200,12 @@ fun ReceiverEditScreen(
                     contactError?.let { Text(text = it, color = MaterialTheme.colorScheme.error) }
                 }
 
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        OutlinedTextField(
-                            value = minCountText,
-                            onValueChange = { minCountText = it.filter(Char::isDigit) },
-                            label = { Text("Min images") },
-                            modifier = Modifier.weight(1f),
-                            isError = countError != null,
-                        )
-
-                        OutlinedTextField(
-                            value = maxCountText,
-                            onValueChange = { maxCountText = it.filter(Char::isDigit) },
-                            label = { Text("Max images") },
-                            modifier = Modifier.weight(1f),
-                            isError = countError != null,
-                        )
-                    }
-                    countError?.let { Text(text = it, color = MaterialTheme.colorScheme.error) }
-                }
-
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(text = "Schedule times", style = MaterialTheme.typography.labelLarge)
-                    // [Review][Patch] remove by index, not by value — value-based removal would
-                    // remove the wrong row if duplicate times were ever present.
-                    scheduleTimes.forEachIndexed { index, time ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            Text(
-                                text = "%02d:%02d".format(time / 60, time % 60),
-                                modifier = Modifier.padding(top = 12.dp),
-                            )
-                            TextButton(onClick = { scheduleTimes.removeAt(index) }) {
-                                Text("Remove")
-                            }
-                        }
-                    }
-                    Button(onClick = { showTimePicker = true }, modifier = Modifier.fillMaxWidth()) {
-                        Text("Add time")
-                    }
-                    if (duplicateTimeMessage) {
-                        Text(text = "That time is already scheduled.", color = MaterialTheme.colorScheme.error)
-                    }
-                    scheduleError?.let { Text(text = it, color = MaterialTheme.colorScheme.error) }
-                }
+                ScheduleTimeListEditor(
+                    scheduleTimes = scheduleTimes,
+                    onAddTimeClick = { showTimePicker = true },
+                    duplicateTimeMessage = duplicateTimeMessage,
+                    error = scheduleError,
+                )
 
                 Button(
                     modifier = Modifier.fillMaxWidth(),
@@ -266,8 +213,6 @@ fun ReceiverEditScreen(
                     onClick = {
                         val trimmedName = name.trim()
                         val trimmedEmail = email.trim()
-                        val min = minCountText.toIntOrNull()
-                        val max = maxCountText.toIntOrNull()
                         val contact = if (channel == ReceiverChannel.WHATSAPP) "+91$phoneDigits" else trimmedEmail
 
                         nameError = if (trimmedName.isBlank()) "Enter a name." else null
@@ -279,17 +224,14 @@ fun ReceiverEditScreen(
                             channel == ReceiverChannel.EMAIL && !trimmedEmail.contains("@") -> "Enter a valid email."
                             else -> null
                         }
-                        countError = when {
-                            min == null || max == null -> "Enter min and max image counts."
-                            min > max -> "Min can't be greater than max."
-                            else -> null
-                        }
-                        scheduleError = if (scheduleTimes.size < MIN_SCHEDULE_TIMES) {
+                        // Empty is valid (falls back to the master schedule); only a partially
+                        // filled list (1-3 times) is rejected. [Sprint Change Proposal 2026-07-12]
+                        scheduleError = if (scheduleTimes.isNotEmpty() && scheduleTimes.size < MIN_SCHEDULE_TIMES) {
                             "Add at least $MIN_SCHEDULE_TIMES schedule times."
                         } else {
                             null
                         }
-                        if (nameError != null || contactError != null || countError != null || scheduleError != null) {
+                        if (nameError != null || contactError != null || scheduleError != null) {
                             return@Button
                         }
 
@@ -299,8 +241,6 @@ fun ReceiverEditScreen(
                             name = trimmedName,
                             channel = channel.name,
                             phoneOrEmail = contact,
-                            minCount = min!!,
-                            maxCount = max!!,
                         )
                         viewModel.save(receiver, scheduleTimes.toList(), isNew) { success ->
                             if (success) onDone() else saveError = "Couldn't save — please try again."

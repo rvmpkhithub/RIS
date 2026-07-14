@@ -27,4 +27,7 @@ interface ImageDao {
      */
     @Query("SELECT * FROM images WHERE id = :id")
     suspend fun getById(id: Long): Image?
+
+    @Query("UPDATE images SET title = :title, description = :description WHERE id = :id")
+    suspend fun updateDetails(id: Long, title: String?, description: String?)
 }

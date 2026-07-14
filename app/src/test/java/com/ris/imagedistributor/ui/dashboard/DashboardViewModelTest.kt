@@ -41,8 +41,8 @@ class DashboardViewModelTest {
     // longer has its own injectable clock, so tests control the cutoff directly instead.
     private val cutoffFlow = MutableStateFlow(fixedNow.minus(30, ChronoUnit.DAYS))
 
-    private val receiverA = Receiver(id = 1L, name = "Asha", channel = "WHATSAPP", phoneOrEmail = "+911234567890", minCount = 2, maxCount = 5)
-    private val receiverB = Receiver(id = 2L, name = "Bala", channel = "EMAIL", phoneOrEmail = "bala@example.com", minCount = 2, maxCount = 5)
+    private val receiverA = Receiver(id = 1L, name = "Asha", channel = "WHATSAPP", phoneOrEmail = "+911234567890")
+    private val receiverB = Receiver(id = 2L, name = "Bala", channel = "EMAIL", phoneOrEmail = "bala@example.com")
     private val image = Image(id = 9L, filePath = "a.jpg", active = true, uploadedAt = 0L)
     private val recordA = DeliveryRecord(transmissionId = 1L, image = image, sentAt = fixedNow)
 

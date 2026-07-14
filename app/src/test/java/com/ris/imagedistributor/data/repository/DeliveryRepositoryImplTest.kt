@@ -28,10 +28,10 @@ class DeliveryRepositoryImplTest {
     private lateinit var repository: DeliveryRepositoryImpl
 
     private val whatsAppReceiver = Receiver(
-        id = 1L, name = "Asha", channel = "WHATSAPP", phoneOrEmail = "+911234567890", minCount = 2, maxCount = 5,
+        id = 1L, name = "Asha", channel = "WHATSAPP", phoneOrEmail = "+911234567890",
     )
     private val emailReceiver = Receiver(
-        id = 2L, name = "Bala", channel = "EMAIL", phoneOrEmail = "bala@example.com", minCount = 2, maxCount = 5,
+        id = 2L, name = "Bala", channel = "EMAIL", phoneOrEmail = "bala@example.com",
     )
     private val image = Image(id = 10L, filePath = "photo.jpg", active = true, uploadedAt = 0L)
 

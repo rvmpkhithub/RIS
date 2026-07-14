@@ -20,6 +20,7 @@ import androidx.work.testing.TestListenableWorkerBuilder
 import com.ris.imagedistributor.data.repository.ComplianceRepository
 import com.ris.imagedistributor.data.repository.DeliveryRepository
 import com.ris.imagedistributor.data.repository.ImageRepository
+import com.ris.imagedistributor.data.repository.MasterScheduleRepository
 import com.ris.imagedistributor.data.repository.ReceiverRepository
 import com.ris.imagedistributor.data.repository.TransmissionRepository
 import com.ris.imagedistributor.di.AppContainer
@@ -53,10 +54,11 @@ class SendWorkerTest {
         coEvery { complianceRepository.getState() } returns AppResult.Success(null)
         val complianceGate: ComplianceGate = mockk()
         val imageSelectionEngine = ImageSelectionEngine(imageRepository, transmissionRepository)
+        val masterScheduleRepository: MasterScheduleRepository = mockk()
 
         val dispatcher = SendDispatcher(
             receiverRepository, imageRepository, imageSelectionEngine, transmissionRepository,
-            deliveryRepository, complianceRepository, complianceGate,
+            deliveryRepository, complianceRepository, complianceGate, masterScheduleRepository,
         )
         val container: AppContainer = mockk()
         every { container.sendDispatcher } returns dispatcher

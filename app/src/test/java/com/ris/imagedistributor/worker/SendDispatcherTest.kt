@@ -8,6 +8,7 @@ import com.ris.imagedistributor.data.local.Transmission
 import com.ris.imagedistributor.data.repository.ComplianceRepository
 import com.ris.imagedistributor.data.repository.DeliveryRepository
 import com.ris.imagedistributor.data.repository.ImageRepository
+import com.ris.imagedistributor.data.repository.MasterScheduleRepository
 import com.ris.imagedistributor.data.repository.ReceiverRepository
 import com.ris.imagedistributor.data.repository.TransmissionRepository
 import com.ris.imagedistributor.domain.AppResult
@@ -36,9 +37,10 @@ class SendDispatcherTest {
     private lateinit var deliveryRepository: DeliveryRepository
     private lateinit var complianceRepository: ComplianceRepository
     private lateinit var complianceGate: ComplianceGate
+    private lateinit var masterScheduleRepository: MasterScheduleRepository
 
     private val compliantState = ComplianceState(nickname = "Ris", city = "Pune", locked = true)
-    private val receiver = Receiver(id = 1L, name = "Asha", channel = "WHATSAPP", phoneOrEmail = "+911234567890", minCount = 2, maxCount = 2)
+    private val receiver = Receiver(id = 1L, name = "Asha", channel = "WHATSAPP", phoneOrEmail = "+911234567890")
     private val image = Image(id = 10L, filePath = "a.jpg", active = true, uploadedAt = 0L)
 
     // Fixed "now": 2026-07-11T10:00 local time -> 600 minutes since midnight.
@@ -53,15 +55,19 @@ class SendDispatcherTest {
         deliveryRepository = mockk()
         complianceRepository = mockk()
         complianceGate = mockk()
+        masterScheduleRepository = mockk()
 
         coEvery { complianceRepository.getState() } returns AppResult.Success(compliantState)
         coEvery { complianceGate.evaluate(any(), any()) } returns GateResult.Proceed
         coEvery { transmissionRepository.getRetryCandidates() } returns AppResult.Success(emptyList())
+        // Every existing test uses receivers with their own non-empty schedule times, so this
+        // default keeps them unaffected — only the new fallback-specific tests override it.
+        coEvery { masterScheduleRepository.getScheduleTimes() } returns AppResult.Success(emptyList())
     }
 
     private fun dispatcher(now: () -> Instant = { fixedNow }) = SendDispatcher(
         receiverRepository, imageRepository, imageSelectionEngine, transmissionRepository,
-        deliveryRepository, complianceRepository, complianceGate, now,
+        deliveryRepository, complianceRepository, complianceGate, masterScheduleRepository, now,
     )
 
     @Test
@@ -98,7 +104,7 @@ class SendDispatcherTest {
         val rws = ReceiverWithSchedules(receiver, listOf(540)) // 9:00am, due (now is 10:00am)
         coEvery { receiverRepository.getAllWithSchedules() } returns AppResult.Success(listOf(rws))
         coEvery { transmissionRepository.hasDispatchedToday(1L, 540, any()) } returns AppResult.Success(false)
-        coEvery { imageSelectionEngine.selectImagesFor(1L, 2, 2) } returns AppResult.Success(listOf(image))
+        coEvery { imageSelectionEngine.selectImageFor(1L) } returns AppResult.Success(image)
         val enqueued = Transmission(id = 99L, receiverId = 1L, imageId = 10L, status = "PENDING", attemptCount = 0, sentAt = null, createdAt = fixedNow.toEpochMilli(), scheduleTime = 540)
         coEvery { transmissionRepository.enqueue(1L, 10L, 540, fixedNow) } returns AppResult.Success(enqueued)
         coEvery { deliveryRepository.send(receiver, image) } returns AppResult.Success(Unit)
@@ -118,7 +124,7 @@ class SendDispatcherTest {
         val rws = ReceiverWithSchedules(receiver, listOf(540))
         coEvery { receiverRepository.getAllWithSchedules() } returns AppResult.Success(listOf(rws))
         coEvery { transmissionRepository.hasDispatchedToday(any(), any(), any()) } returns AppResult.Success(false)
-        coEvery { imageSelectionEngine.selectImagesFor(any(), any(), any()) } returns AppResult.Success(listOf(image))
+        coEvery { imageSelectionEngine.selectImageFor(any()) } returns AppResult.Success(image)
         val enqueued = Transmission(id = 99L, receiverId = 1L, imageId = 10L, status = "PENDING", attemptCount = 0, sentAt = null, createdAt = fixedNow.toEpochMilli(), scheduleTime = 540)
         coEvery { transmissionRepository.enqueue(any(), any(), any(), any()) } returns AppResult.Success(enqueued)
         coEvery { deliveryRepository.send(any(), any()) } returns AppResult.Failure(FailureReason.UNKNOWN)
@@ -139,7 +145,7 @@ class SendDispatcherTest {
 
         dispatcher().dispatchDueSends()
 
-        coVerify(exactly = 0) { imageSelectionEngine.selectImagesFor(any(), any(), any()) }
+        coVerify(exactly = 0) { imageSelectionEngine.selectImageFor(any()) }
         coVerify(exactly = 0) { transmissionRepository.enqueue(any(), any(), any(), any()) }
     }
 
@@ -151,7 +157,7 @@ class SendDispatcherTest {
         dispatcher().dispatchDueSends()
 
         coVerify(exactly = 0) { transmissionRepository.hasDispatchedToday(any(), any(), any()) }
-        coVerify(exactly = 0) { imageSelectionEngine.selectImagesFor(any(), any(), any()) }
+        coVerify(exactly = 0) { imageSelectionEngine.selectImageFor(any()) }
     }
 
     @Test
@@ -220,7 +226,7 @@ class SendDispatcherTest {
         val rws = ReceiverWithSchedules(receiver, listOf(540))
         coEvery { receiverRepository.getAllWithSchedules() } returns AppResult.Success(listOf(rws))
         coEvery { transmissionRepository.hasDispatchedToday(1L, 540, any()) } returns AppResult.Success(false)
-        coEvery { imageSelectionEngine.selectImagesFor(any(), any(), any()) } returns AppResult.Success(listOf(image))
+        coEvery { imageSelectionEngine.selectImageFor(any()) } returns AppResult.Success(image)
         val enqueued = Transmission(id = 1L, receiverId = 1L, imageId = 10L, status = "PENDING", attemptCount = 0, sentAt = null, createdAt = dayTwoNow.toEpochMilli(), scheduleTime = 540)
         coEvery { transmissionRepository.enqueue(any(), any(), any(), any()) } returns AppResult.Success(enqueued)
         coEvery { deliveryRepository.send(any(), any()) } returns AppResult.Success(Unit)
@@ -273,7 +279,7 @@ class SendDispatcherTest {
         val rws = ReceiverWithSchedules(receiver, listOf(540))
         coEvery { receiverRepository.getAllWithSchedules() } returns AppResult.Success(listOf(rws))
         coEvery { transmissionRepository.hasDispatchedToday(any(), any(), any()) } returns AppResult.Success(false)
-        coEvery { imageSelectionEngine.selectImagesFor(any(), any(), any()) } returns AppResult.Success(listOf(image))
+        coEvery { imageSelectionEngine.selectImageFor(any()) } returns AppResult.Success(image)
         val enqueued = Transmission(id = 1L, receiverId = 1L, imageId = 10L, status = "PENDING", attemptCount = 0, sentAt = null, createdAt = 0L, scheduleTime = 540)
         coEvery { transmissionRepository.enqueue(any(), any(), any(), any()) } returns AppResult.Success(enqueued)
         coEvery { deliveryRepository.send(any(), any()) } throws CancellationException("cancelled")
@@ -284,5 +290,68 @@ class SendDispatcherTest {
         } catch (e: CancellationException) {
             // expected
         }
+    }
+
+    @Test
+    fun `a receiver with no schedule of its own dispatches using a due master-schedule time`() = runTest {
+        val rws = ReceiverWithSchedules(receiver, emptyList())
+        coEvery { receiverRepository.getAllWithSchedules() } returns AppResult.Success(listOf(rws))
+        coEvery { masterScheduleRepository.getScheduleTimes() } returns AppResult.Success(listOf(540)) // 9:00am, due
+        coEvery { transmissionRepository.hasDispatchedToday(1L, 540, any()) } returns AppResult.Success(false)
+        coEvery { imageSelectionEngine.selectImageFor(1L) } returns AppResult.Success(image)
+        val enqueued = Transmission(id = 1L, receiverId = 1L, imageId = 10L, status = "PENDING", attemptCount = 0, sentAt = null, createdAt = fixedNow.toEpochMilli(), scheduleTime = 540)
+        coEvery { transmissionRepository.enqueue(1L, 10L, 540, fixedNow) } returns AppResult.Success(enqueued)
+        coEvery { deliveryRepository.send(receiver, image) } returns AppResult.Success(Unit)
+        coEvery { transmissionRepository.update(any()) } returns AppResult.Success(Unit)
+
+        dispatcher().dispatchDueSends()
+
+        coVerify { transmissionRepository.enqueue(1L, 10L, 540, fixedNow) }
+    }
+
+    @Test
+    fun `a receiver with its own schedule never falls back to the master schedule, even partially`() = runTest {
+        // Receiver has exactly one time of its own (540, due); the master schedule separately has
+        // a different due time (600) that must never be consulted for this receiver at all.
+        val rws = ReceiverWithSchedules(receiver, listOf(540))
+        coEvery { receiverRepository.getAllWithSchedules() } returns AppResult.Success(listOf(rws))
+        coEvery { masterScheduleRepository.getScheduleTimes() } returns AppResult.Success(listOf(600))
+        coEvery { transmissionRepository.hasDispatchedToday(1L, 540, any()) } returns AppResult.Success(false)
+        coEvery { imageSelectionEngine.selectImageFor(1L) } returns AppResult.Success(image)
+        val enqueued = Transmission(id = 1L, receiverId = 1L, imageId = 10L, status = "PENDING", attemptCount = 0, sentAt = null, createdAt = fixedNow.toEpochMilli(), scheduleTime = 540)
+        coEvery { transmissionRepository.enqueue(1L, 10L, 540, fixedNow) } returns AppResult.Success(enqueued)
+        coEvery { deliveryRepository.send(receiver, image) } returns AppResult.Success(Unit)
+        coEvery { transmissionRepository.update(any()) } returns AppResult.Success(Unit)
+
+        dispatcher().dispatchDueSends()
+
+        coVerify { transmissionRepository.enqueue(1L, 10L, 540, fixedNow) }
+        coVerify(exactly = 0) { transmissionRepository.hasDispatchedToday(1L, 600, any()) }
+        coVerify(exactly = 0) { transmissionRepository.enqueue(1L, any(), 600, any()) }
+    }
+
+    @Test
+    fun `a master-schedule lookup failure leaves schedule-less receivers with nothing dispatched, without throwing`() = runTest {
+        val rws = ReceiverWithSchedules(receiver, emptyList())
+        coEvery { receiverRepository.getAllWithSchedules() } returns AppResult.Success(listOf(rws))
+        coEvery { masterScheduleRepository.getScheduleTimes() } returns AppResult.Failure(FailureReason.DATABASE_ERROR)
+
+        dispatcher().dispatchDueSends() // should not throw
+
+        coVerify(exactly = 0) { imageSelectionEngine.selectImageFor(any()) }
+        coVerify(exactly = 0) { transmissionRepository.enqueue(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `selectImageFor returning null (no active images) results in nothing enqueued and no delivery attempt`() = runTest {
+        val rws = ReceiverWithSchedules(receiver, listOf(540))
+        coEvery { receiverRepository.getAllWithSchedules() } returns AppResult.Success(listOf(rws))
+        coEvery { transmissionRepository.hasDispatchedToday(1L, 540, any()) } returns AppResult.Success(false)
+        coEvery { imageSelectionEngine.selectImageFor(1L) } returns AppResult.Success(null)
+
+        dispatcher().dispatchDueSends() // should not throw
+
+        coVerify(exactly = 0) { transmissionRepository.enqueue(any(), any(), any(), any()) }
+        coVerify(exactly = 0) { deliveryRepository.send(any(), any()) }
     }
 }

@@ -20,8 +20,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ReceiverSchedule::class,
         Transmission::class,
         RetentionSetting::class,
+        MasterSchedule::class,
     ],
-    version = 7,
+    version = 10,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -31,6 +32,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun receiverScheduleDao(): ReceiverScheduleDao
     abstract fun transmissionDao(): TransmissionDao
     abstract fun retentionSettingDao(): RetentionSettingDao
+    abstract fun masterScheduleDao(): MasterScheduleDao
 
     companion object {
         const val DATABASE_NAME: String = "image-distributor.db"
@@ -136,6 +138,66 @@ abstract class AppDatabase : RoomDatabase() {
                         "`retentionDays` INTEGER NOT NULL)"
                 )
                 db.execSQL("INSERT INTO `retention_settings` (`id`, `retentionDays`) VALUES (1, 30)")
+            }
+        }
+
+        /**
+         * Adds the `master_schedule` table (Story 2.3) and seeds it with 4 default times, for an
+         * app upgrading from an existing v7 database. A fresh install never runs this migration
+         * (Room creates the schema straight from the `@Entity` annotations) — see
+         * `MasterScheduleRepositoryImpl`'s `DEFAULT_MASTER_SCHEDULE_TIMES` fallback for how that
+         * case is covered, mirroring `RetentionSettingDao`'s equivalent fresh-install gap.
+         */
+        val MIGRATION_7_8: Migration = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `master_schedule` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`time` INTEGER NOT NULL)"
+                )
+                // [Review][Patch] guard the seed against a retried migration (e.g. process death
+                // mid-upgrade) — CREATE TABLE IF NOT EXISTS alone would silently no-op while this
+                // loop still re-ran, duplicating the 4 default rows.
+                val alreadySeeded = db.query("SELECT COUNT(*) FROM `master_schedule`").use { cursor ->
+                    cursor.moveToFirst() && cursor.getInt(0) > 0
+                }
+                if (!alreadySeeded) {
+                    listOf(540, 720, 900, 1080).forEach { time -> // 09:00, 12:00, 15:00, 18:00
+                        db.execSQL("INSERT INTO `master_schedule` (`time`) VALUES ($time)")
+                    }
+                }
+            }
+        }
+
+        /**
+         * Adds optional title/description tagging to images (Story 1.4) — purely additive,
+         * nullable columns, nothing to backfill for existing rows.
+         */
+        val MIGRATION_8_9: Migration = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `images` ADD COLUMN `title` TEXT")
+                db.execSQL("ALTER TABLE `images` ADD COLUMN `description` TEXT")
+            }
+        }
+
+        /**
+         * Drops `minCount`/`maxCount` from `receivers` (Story 2.4 — every scheduled send now
+         * delivers exactly one image, making a per-receiver count range meaningless). Recreated via
+         * the same copy-and-rename pattern MIGRATION_3_4 already established. Destructive and
+         * intentional — no migration path preserves the dropped columns' values (epics.md#Story
+         * 2.4's own AC3: "no data migration path preserves it, since it no longer has any purpose").
+         */
+        val MIGRATION_9_10: Migration = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE `receivers_new` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`name` TEXT NOT NULL, `channel` TEXT NOT NULL, `phoneOrEmail` TEXT NOT NULL)"
+                )
+                db.execSQL(
+                    "INSERT INTO `receivers_new` (`id`, `name`, `channel`, `phoneOrEmail`) " +
+                        "SELECT `id`, `name`, `channel`, `phoneOrEmail` FROM `receivers`"
+                )
+                db.execSQL("DROP TABLE `receivers`")
+                db.execSQL("ALTER TABLE `receivers_new` RENAME TO `receivers`")
             }
         }
     }

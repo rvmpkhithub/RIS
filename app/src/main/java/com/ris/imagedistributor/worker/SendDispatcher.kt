@@ -8,6 +8,7 @@ import com.ris.imagedistributor.data.local.TransmissionStatus
 import com.ris.imagedistributor.data.repository.ComplianceRepository
 import com.ris.imagedistributor.data.repository.DeliveryRepository
 import com.ris.imagedistributor.data.repository.ImageRepository
+import com.ris.imagedistributor.data.repository.MasterScheduleRepository
 import com.ris.imagedistributor.data.repository.ReceiverRepository
 import com.ris.imagedistributor.data.repository.TransmissionRepository
 import com.ris.imagedistributor.domain.AppResult
@@ -40,6 +41,7 @@ class SendDispatcher(
     private val deliveryRepository: DeliveryRepository,
     private val complianceRepository: ComplianceRepository,
     private val complianceGate: ComplianceGate,
+    private val masterScheduleRepository: MasterScheduleRepository,
     private val now: () -> Instant = Instant::now,
 ) {
 
@@ -64,7 +66,15 @@ class SendDispatcher(
         val todayStart = nowInstant.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant()
 
         retryPendingItems(receiverById, todayStart)
-        dispatchDueSlots(receivers, nowInstant, todayStart, zone)
+
+        // Fetched once per run, not once per receiver — app-wide, and AD-16 only requires it be
+        // queried live per run, not per receiver. A failure here is fail-safe: schedule-less
+        // receivers simply have nothing due this run, not a crash.
+        val masterScheduleTimes = when (val result = masterScheduleRepository.getScheduleTimes()) {
+            is AppResult.Success -> result.value
+            is AppResult.Failure -> emptyList()
+        }
+        dispatchDueSlots(receivers, nowInstant, todayStart, zone, masterScheduleTimes)
     }
 
     private suspend fun retryPendingItems(receiverById: Map<Long, ReceiverWithSchedules>, todayStart: Instant) {
@@ -98,13 +108,17 @@ class SendDispatcher(
         nowInstant: Instant,
         todayStart: Instant,
         zone: ZoneId,
+        masterScheduleTimes: List<Int>,
     ) {
         val zonedNow = nowInstant.atZone(zone)
         val nowMinutesOfDay = zonedNow.hour * 60 + zonedNow.minute
 
         for (receiverWithSchedules in receivers) {
             val receiver = receiverWithSchedules.receiver
-            for (scheduleTime in receiverWithSchedules.scheduleTimes) {
+            // A receiver with any schedule of its own never consults the master schedule at
+            // all, even partially — all-or-nothing per receiver, never merged. [AD-16]
+            val effectiveScheduleTimes = receiverWithSchedules.scheduleTimes.ifEmpty { masterScheduleTimes }
+            for (scheduleTime in effectiveScheduleTimes) {
                 if (scheduleTime > nowMinutesOfDay) continue // not due yet today
 
                 val alreadyDispatched = when (
@@ -115,22 +129,20 @@ class SendDispatcher(
                 }
                 if (alreadyDispatched) continue
 
-                val selected = when (
-                    val result = imageSelectionEngine.selectImagesFor(receiver.id, receiver.minCount, receiver.maxCount)
+                val image = when (
+                    val result = imageSelectionEngine.selectImageFor(receiver.id)
+                ) {
+                    is AppResult.Success -> result.value ?: continue // no active images — nothing due to send this slot
+                    is AppResult.Failure -> continue
+                }
+
+                val enqueued = when (
+                    val result = transmissionRepository.enqueue(receiver.id, image.id, scheduleTime, nowInstant)
                 ) {
                     is AppResult.Success -> result.value
                     is AppResult.Failure -> continue
                 }
-
-                for (image in selected) {
-                    val enqueued = when (
-                        val result = transmissionRepository.enqueue(receiver.id, image.id, scheduleTime, nowInstant)
-                    ) {
-                        is AppResult.Success -> result.value
-                        is AppResult.Failure -> continue
-                    }
-                    attemptDelivery(receiver, image, enqueued)
-                }
+                attemptDelivery(receiver, image, enqueued)
             }
         }
     }
