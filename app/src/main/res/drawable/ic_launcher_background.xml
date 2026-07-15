@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Image Distributor rebrand (2026-07-15) — plain white behind the "ID" mark's own blue, for
+     contrast under every adaptive-icon mask shape without competing with the glyph's color. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    <solid android:color="#2F5D8A" />
+    <solid android:color="#FFFFFF" />
 </shape>

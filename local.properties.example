@@ -1,0 +1,25 @@
+# Template for local.properties — copy the keys you need into your own local.properties
+# (gitignored, never commit it). Android already generates local.properties with sdk.dir when you
+# first open this project; just append the keys below to that same file.
+#
+# WHEN to set each one:
+#
+# - sdk.dir — set automatically by Android Studio / the SDK tooling on first sync. You normally
+#   never touch this by hand.
+#
+# - SMTP_USERNAME / SMTP_APP_PASSWORD — set these before the first time you need EMAIL delivery to
+#   actually send (live-testing an EMAIL-channel receiver, or any real end-to-end send). Until
+#   they're set, the app still builds and runs fine — email sends will just fail at runtime with a
+#   bad-login error, the same "TODO-operator-supplied" placeholder behavior this project has always
+#   used for not-yet-configured secrets. Get SMTP_APP_PASSWORD from a Google Account "App Password"
+#   (myaccount.google.com/apppasswords — requires 2-Step Verification enabled on that account),
+#   NOT your normal Gmail password.
+#
+# - WHATSAPP_API_URL / WHATSAPP_API_TOKEN / WHATSAPP_TEMPLATE_NAME — not wired up to
+#   local.properties yet (still hardcoded TODO placeholders in AppConfig.kt) because the WhatsApp
+#   Business Cloud API account/template haven't been provisioned. When they are, move them here
+#   the same way SMTP_* was moved: add a buildConfigField for each in app/build.gradle.kts, read
+#   them via BuildConfig in AppConfig.kt, and add the real values to your local.properties.
+
+SMTP_USERNAME=your-account@gmail.com
+SMTP_APP_PASSWORD=your 16 char app password

@@ -216,7 +216,7 @@ private fun ReceiverRow(entry: ReceiverWithSchedules, viewModel: ReceiversViewMo
                     // Proposal 2026-07-12], since zero is now a valid, intentional state.
                     val scheduleSummary = if (entry.scheduleTimes.isEmpty()) "Uses master schedule" else "${entry.scheduleTimes.size}×/day"
                     Text(
-                        text = scheduleSummary,
+                        text = "$scheduleSummary · %d–%d images".format(receiver.minCount, receiver.maxCount),
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.padding(top = 4.dp),
                     )

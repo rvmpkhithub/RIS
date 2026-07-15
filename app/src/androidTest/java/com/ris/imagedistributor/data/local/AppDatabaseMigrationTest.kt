@@ -225,12 +225,47 @@ class AppDatabaseMigrationTest {
     }
 
     @Test
-    fun migrate1Through10_succeedsAgainstAFreshV1Database() {
+    fun migrate10To11_restoresMinMaxCountColumnsOnReceivers() {
+        helper.createDatabase(TEST_DB, 10).apply {
+            execSQL(
+                "INSERT INTO receivers (id, name, channel, phoneOrEmail) VALUES (1, 'Asha', 'WHATSAPP', '+911234567890')"
+            )
+            close()
+        }
+
+        val db = helper.runMigrationsAndValidate(TEST_DB, 11, true, AppDatabase.MIGRATION_10_11)
+
+        val columnNames = db.query("SELECT * FROM receivers").columnNames.toList()
+        assert(columnNames.containsAll(listOf("minCount", "maxCount"))) {
+            "expected minCount/maxCount to be restored, got columns $columnNames"
+        }
+
+        val cursor = db.query("SELECT id, name, minCount, maxCount FROM receivers WHERE id = 1")
+        assert(cursor.moveToFirst()) { "expected the migrated receiver row to survive" }
+        assert(cursor.getString(cursor.getColumnIndexOrThrow("name")) == "Asha")
+        assert(cursor.getInt(cursor.getColumnIndexOrThrow("minCount")) == 2) { "expected the backfilled default of 2" }
+        assert(cursor.getInt(cursor.getColumnIndexOrThrow("maxCount")) == 5) { "expected the backfilled default of 5" }
+        cursor.close()
+
+        // New rows can also supply real values for the restored columns.
+        db.execSQL(
+            "INSERT INTO receivers (id, name, channel, phoneOrEmail, minCount, maxCount) " +
+                "VALUES (2, 'Kiran', 'EMAIL', 'kiran@example.com', 3, 8)"
+        )
+        val newCursor = db.query("SELECT minCount, maxCount FROM receivers WHERE id = 2")
+        assert(newCursor.moveToFirst()) { "expected the newly inserted row to be queryable" }
+        assert(newCursor.getInt(newCursor.getColumnIndexOrThrow("minCount")) == 3)
+        assert(newCursor.getInt(newCursor.getColumnIndexOrThrow("maxCount")) == 8)
+        newCursor.close()
+    }
+
+    @Test
+    fun migrate1Through11_succeedsAgainstAFreshV1Database() {
         helper.createDatabase(TEST_DB, 1).close()
 
         helper.runMigrationsAndValidate(
             TEST_DB,
-            10,
+            11,
             true,
             AppDatabase.MIGRATION_1_2,
             AppDatabase.MIGRATION_2_3,
@@ -241,6 +276,7 @@ class AppDatabaseMigrationTest {
             AppDatabase.MIGRATION_7_8,
             AppDatabase.MIGRATION_8_9,
             AppDatabase.MIGRATION_9_10,
+            AppDatabase.MIGRATION_10_11,
         )
     }
 

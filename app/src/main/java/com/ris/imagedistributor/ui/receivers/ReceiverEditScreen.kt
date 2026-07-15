@@ -35,6 +35,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.ris.imagedistributor.data.local.DEFAULT_MAX_COUNT
+import com.ris.imagedistributor.data.local.DEFAULT_MIN_COUNT
 import com.ris.imagedistributor.data.local.Receiver
 import com.ris.imagedistributor.data.local.ReceiverChannel
 import com.ris.imagedistributor.data.local.ReceiverWithSchedules
@@ -102,12 +104,15 @@ fun ReceiverEditScreen(
     }
     val scheduleTimes = remember { mutableStateListOf<Int>().apply { addAll(existing?.scheduleTimes.orEmpty()) } }
     var showTimePicker by remember { mutableStateOf(false) }
+    var minCountText by remember { mutableStateOf((existingReceiver?.minCount ?: DEFAULT_MIN_COUNT).toString()) }
+    var maxCountText by remember { mutableStateOf((existingReceiver?.maxCount ?: DEFAULT_MAX_COUNT).toString()) }
 
     // [Review][Patch] per-field errors, rendered under each field — EXPERIENCE.md#Component
     // Patterns specifies inline error text under the field, not one shared message.
     var nameError by remember { mutableStateOf<String?>(null) }
     var contactError by remember { mutableStateOf<String?>(null) }
     var scheduleError by remember { mutableStateOf<String?>(null) }
+    var countError by remember { mutableStateOf<String?>(null) }
     var saveError by remember { mutableStateOf<String?>(null) }
     // [Review][Patch] picking a time already in the list used to silently no-op — this surfaces
     // that so the user knows their tap did nothing rather than assuming it was added.
@@ -200,6 +205,29 @@ fun ReceiverEditScreen(
                     contactError?.let { Text(text = it, color = MaterialTheme.colorScheme.error) }
                 }
 
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        OutlinedTextField(
+                            value = minCountText,
+                            onValueChange = { minCountText = it.filter(Char::isDigit) },
+                            label = { Text("Min images") },
+                            modifier = Modifier.weight(1f),
+                            isError = countError != null,
+                        )
+                        OutlinedTextField(
+                            value = maxCountText,
+                            onValueChange = { maxCountText = it.filter(Char::isDigit) },
+                            label = { Text("Max images") },
+                            modifier = Modifier.weight(1f),
+                            isError = countError != null,
+                        )
+                    }
+                    countError?.let { Text(text = it, color = MaterialTheme.colorScheme.error) }
+                }
+
                 ScheduleTimeListEditor(
                     scheduleTimes = scheduleTimes,
                     onAddTimeClick = { showTimePicker = true },
@@ -231,7 +259,14 @@ fun ReceiverEditScreen(
                         } else {
                             null
                         }
-                        if (nameError != null || contactError != null || scheduleError != null) {
+                        val minCount = minCountText.toIntOrNull()
+                        val maxCount = maxCountText.toIntOrNull()
+                        countError = when {
+                            minCount == null || minCount < 1 -> "Enter a minimum of at least 1."
+                            maxCount == null || maxCount < minCount -> "Max must be at least the minimum."
+                            else -> null
+                        }
+                        if (nameError != null || contactError != null || scheduleError != null || countError != null) {
                             return@Button
                         }
 
@@ -241,9 +276,17 @@ fun ReceiverEditScreen(
                             name = trimmedName,
                             channel = channel.name,
                             phoneOrEmail = contact,
+                            minCount = minCount!!,
+                            maxCount = maxCount!!,
                         )
-                        viewModel.save(receiver, scheduleTimes.toList(), isNew) { success ->
-                            if (success) onDone() else saveError = "Couldn't save — please try again."
+                        // saveWithBudgetCheck lives entirely in viewModelScope (budget check
+                        // included, not just the persist call) — [Review][Patch] fix: an earlier
+                        // version of this ran the budget check on this screen's own
+                        // rememberCoroutineScope, which is cancelled if the operator navigates
+                        // away while that suspend call is still in flight, silently dropping the
+                        // save. Same reasoning as viewModel.save()'s own doc comment.
+                        viewModel.saveWithBudgetCheck(receiver, scheduleTimes.toList(), isNew, existingReceiver?.id) { error ->
+                            if (error == null) onDone() else saveError = error
                         }
                     },
                 ) {

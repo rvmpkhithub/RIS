@@ -22,7 +22,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         RetentionSetting::class,
         MasterSchedule::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -195,6 +195,30 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL(
                     "INSERT INTO `receivers_new` (`id`, `name`, `channel`, `phoneOrEmail`) " +
                         "SELECT `id`, `name`, `channel`, `phoneOrEmail` FROM `receivers`"
+                )
+                db.execSQL("DROP TABLE `receivers`")
+                db.execSQL("ALTER TABLE `receivers_new` RENAME TO `receivers`")
+            }
+        }
+
+        /**
+         * Restores `minCount`/`maxCount` on `receivers` (operator-requested field addendum,
+         * 2026-07-14) — reversing MIGRATION_9_10's removal, now repurposed as the per-receiver
+         * bounds for `ImageSelectionEngine`'s coordinated dispatch-tick allocation rather than the
+         * old independent per-send range Story 2.4 removed. Existing rows backfill to
+         * DEFAULT_MIN_COUNT/DEFAULT_MAX_COUNT (2/5) — their original values were never preserved
+         * across MIGRATION_9_10, so there is nothing more accurate to restore them to.
+         */
+        val MIGRATION_10_11: Migration = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE `receivers_new` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`name` TEXT NOT NULL, `channel` TEXT NOT NULL, `phoneOrEmail` TEXT NOT NULL, " +
+                        "`minCount` INTEGER NOT NULL, `maxCount` INTEGER NOT NULL)"
+                )
+                db.execSQL(
+                    "INSERT INTO `receivers_new` (`id`, `name`, `channel`, `phoneOrEmail`, `minCount`, `maxCount`) " +
+                        "SELECT `id`, `name`, `channel`, `phoneOrEmail`, $DEFAULT_MIN_COUNT, $DEFAULT_MAX_COUNT FROM `receivers`"
                 )
                 db.execSQL("DROP TABLE `receivers`")
                 db.execSQL("ALTER TABLE `receivers_new` RENAME TO `receivers`")

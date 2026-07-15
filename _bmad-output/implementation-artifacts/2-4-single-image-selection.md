@@ -6,6 +6,8 @@ baseline_commit: NO_VCS
 
 Status: done
 
+**Reversed (2026-07-14/15, operator request during tablet field-testing):** this story's core premise — exactly one image per scheduled send, no per-receiver count — was walked back. `Receiver.minCount`/`maxCount` are restored (`MIGRATION_10_11`), and `ImageSelectionEngine` now coordinates every due receiver's random draw *within its own [min, max]* across a whole dispatch tick, so the combined total sent matches the number of currently-active images exactly (a new requirement this story never had). See Story 2.4's own Tasks below for the *original* design this reverses — they remain accurate as a historical record of what shipped between 2026-07-13 and 2026-07-14, not of the app's current behavior. The replacement logic lives in `ImageSelectionEngine.selectImagesForUnits`/`SendDispatcher.dispatchDueSlots` (see their kdoc) and `ReceiversViewModel.validateMinCountBudget` (new save-time guard ensuring the sum of every receiver's minimum never exceeds the active image count). No dedicated story file was created for this reversal — it was implemented directly during live field-testing, not through the normal create-story workflow.
+
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
 ## Story

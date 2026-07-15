@@ -6,7 +6,8 @@ app/build/
 # Kotlin
 .kotlin/
 
-# Local configuration (machine-specific SDK path — never commit)
+# Local configuration — machine-specific SDK path, plus real secrets (SMTP credentials etc.) as
+# of 2026-07-14/15. Never commit. See local.properties.example for the keys and when to set them.
 local.properties
 
 # Android Studio / IntelliJ (not currently used in this project, but standard to exclude)

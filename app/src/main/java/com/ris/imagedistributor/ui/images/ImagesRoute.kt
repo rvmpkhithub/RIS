@@ -15,8 +15,12 @@ sealed class ImagesRoute {
      * was already inserted in a previous session, so it's unconditionally present in `images` by
      * the time `hasLoaded` is true, and the race this field solves only exists within-session,
      * in the moments immediately after an insert.
+     *
+     * [requireTitleOnSave], unlike [preloaded], IS persisted — it's a small, stable flag (not a
+     * race-avoidance snapshot) that must survive a config change/process death for the upload
+     * flow's "title is mandatory" behavior to hold even if the screen is recreated mid-edit.
      */
-    data class Detail(val imageId: Long, val preloaded: Image? = null) : ImagesRoute()
+    data class Detail(val imageId: Long, val preloaded: Image? = null, val requireTitleOnSave: Boolean = false) : ImagesRoute()
 }
 
 /**
@@ -25,11 +29,20 @@ sealed class ImagesRoute {
  * (rather than inlined in ImagesTab) so this fallback behavior is directly unit-testable.
  */
 val ImagesRouteSaver: Saver<ImagesRoute, String> = Saver(
-    save = { r -> when (r) { is ImagesRoute.List -> "list"; is ImagesRoute.Detail -> "detail:${r.imageId}" } },
+    save = { r ->
+        when (r) {
+            is ImagesRoute.List -> "list"
+            is ImagesRoute.Detail -> "detail:${r.imageId}:${r.requireTitleOnSave}"
+        }
+    },
     restore = { s ->
         runCatching {
-            if (s == "list") ImagesRoute.List
-            else ImagesRoute.Detail(s.removePrefix("detail:").toLong())
+            if (s == "list") {
+                ImagesRoute.List
+            } else {
+                val (id, requireTitle) = s.removePrefix("detail:").split(":")
+                ImagesRoute.Detail(id.toLong(), requireTitleOnSave = requireTitle.toBoolean())
+            }
         }.getOrDefault(ImagesRoute.List)
     },
 )

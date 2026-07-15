@@ -53,7 +53,7 @@ class SendWorkerTest {
         // No compliance state -> SendDispatcher no-ops cleanly without needing a real ComplianceGate.
         coEvery { complianceRepository.getState() } returns AppResult.Success(null)
         val complianceGate: ComplianceGate = mockk()
-        val imageSelectionEngine = ImageSelectionEngine(imageRepository, transmissionRepository)
+        val imageSelectionEngine = ImageSelectionEngine(imageRepository)
         val masterScheduleRepository: MasterScheduleRepository = mockk()
 
         val dispatcher = SendDispatcher(

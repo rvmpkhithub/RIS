@@ -1,0 +1,25 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="letterGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4F6DF5"/>
+      <stop offset="100%" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#1E1B4B" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Transparent background (intentionally no fill/shape here) -->
+
+  <text
+    x="256"
+    y="320"
+    text-anchor="middle"
+    font-family="DejaVu Sans, Arial, sans-serif"
+    font-weight="bold"
+    font-size="240"
+    letter-spacing="-6"
+    fill="url(#letterGradient)"
+    filter="url(#softShadow)"
+  >ID</text>
+</svg>

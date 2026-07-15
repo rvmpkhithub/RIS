@@ -95,6 +95,62 @@ class ImageDetailScreenTest {
         composeTestRule.onNodeWithText("Save").assertIsEnabled()
     }
 
+    @Test
+    fun blocksSaveWithBlankTitleWhenTitleIsRequired() {
+        val repository = mockk<ImageRepository>(relaxed = true)
+        stubResolveFile(repository)
+        val viewModel = ImageLibraryViewModel(repository)
+        var done = false
+
+        composeTestRule.setContent {
+            ImageDropTheme {
+                ImageDetailScreen(
+                    viewModel = viewModel,
+                    imageId = 1L,
+                    existing = image,
+                    stillLoading = false,
+                    requireTitle = true,
+                    onDone = { done = true },
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Sunset").performTextClearance()
+        composeTestRule.onNodeWithText("Save").performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithText("Title is required.").assertIsDisplayed()
+        assertFalse("expected onDone not to fire when a required title is blank", done)
+        coVerify(exactly = 0) { repository.updateImageDetails(any(), any(), any()) }
+    }
+
+    @Test
+    fun allowsSaveWithBlankTitleWhenTitleIsNotRequired() {
+        val repository = mockk<ImageRepository>(relaxed = true)
+        stubResolveFile(repository)
+        coEvery { repository.updateImageDetails(1L, "", "A nice sunset") } returns AppResult.Success(Unit)
+        val viewModel = ImageLibraryViewModel(repository)
+        var done = false
+
+        composeTestRule.setContent {
+            ImageDropTheme {
+                ImageDetailScreen(
+                    viewModel = viewModel,
+                    imageId = 1L,
+                    existing = image,
+                    stillLoading = false,
+                    onDone = { done = true },
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Sunset").performTextClearance()
+        composeTestRule.onNodeWithText("Save").performClick()
+        composeTestRule.waitForIdle()
+
+        assertTrue("expected onDone to fire — title is optional when requireTitle is false (the default)", done)
+    }
+
     private fun stubResolveFile(repository: ImageRepository) {
         every { repository.resolveFile(any()) } returns File("images/a.jpg")
     }

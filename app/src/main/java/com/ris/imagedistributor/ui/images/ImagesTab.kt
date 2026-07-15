@@ -27,7 +27,7 @@ fun ImagesTab(container: AppContainer) {
         is ImagesRoute.List -> ImageLibraryScreen(
             viewModel = viewModel,
             onViewImage = { id -> route = ImagesRoute.Detail(id) },
-            onImageUploaded = { image -> route = ImagesRoute.Detail(image.id, preloaded = image) },
+            onImageUploaded = { image -> route = ImagesRoute.Detail(image.id, preloaded = image, requireTitleOnSave = true) },
         )
         is ImagesRoute.Detail -> {
             val images by viewModel.images.collectAsState()
@@ -37,6 +37,7 @@ fun ImagesTab(container: AppContainer) {
                 imageId = current.imageId,
                 existing = current.preloaded ?: images.find { it.id == current.imageId },
                 stillLoading = !hasLoaded,
+                requireTitle = current.requireTitleOnSave,
                 onDone = { route = ImagesRoute.List },
             )
         }

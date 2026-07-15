@@ -1,5 +1,7 @@
 package com.ris.imagedistributor.config
 
+import com.ris.imagedistributor.BuildConfig
+
 /**
  * Single source of truth for hardcoded external endpoints. [AD-3]
  * No other file in this project may declare these URLs.
@@ -20,10 +22,15 @@ object AppConfig {
     const val WHATSAPP_API_TOKEN: String = "TODO-operator-supplied"
     const val WHATSAPP_TEMPLATE_NAME: String = "TODO-operator-supplied"
 
-    // Real, known constants (Gmail SMTP over STARTTLS) — only the account credentials are TODO.
+    // Real, known constants (Gmail SMTP over STARTTLS) — only the account credentials are secret.
     const val SMTP_HOST: String = "smtp.gmail.com"
     const val SMTP_PORT: Int = 587
-    // TODO: operator-supplied — the Gmail account and App Password this app sends from.
-    const val SMTP_USERNAME: String = "TODO-operator-supplied"
-    const val SMTP_APP_PASSWORD: String = "TODO-operator-supplied"
+    // Real credentials (2026-07-14/15 addendum) — read from local.properties at build time via
+    // BuildConfig, never hardcoded here. This file is tracked in git; local.properties is not.
+    // See local.properties.example for the keys and setup instructions. Falls back to the
+    // pre-existing "TODO-operator-supplied" placeholder if local.properties doesn't set them —
+    // syntactically valid, fails at runtime (a bad SMTP login) rather than at build time, same as
+    // this project's other not-yet-provisioned secrets (WHATSAPP_* above).
+    val SMTP_USERNAME: String = BuildConfig.SMTP_USERNAME
+    val SMTP_APP_PASSWORD: String = BuildConfig.SMTP_APP_PASSWORD
 }

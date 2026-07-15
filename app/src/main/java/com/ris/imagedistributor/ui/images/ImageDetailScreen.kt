@@ -48,6 +48,7 @@ fun ImageDetailScreen(
     imageId: Long,
     existing: Image?,
     stillLoading: Boolean,
+    requireTitle: Boolean = false,
     onDone: () -> Unit,
 ) {
     if (stillLoading) {
@@ -68,6 +69,7 @@ fun ImageDetailScreen(
     var description by remember { mutableStateOf(existing.description ?: "") }
     var active by remember { mutableStateOf(existing.active) }
     var saveError by remember { mutableStateOf<String?>(null) }
+    var titleError by remember { mutableStateOf<String?>(null) }
 
     val isSaving by viewModel.isSaving.collectAsState()
 
@@ -106,9 +108,11 @@ fun ImageDetailScreen(
         ) {
             OutlinedTextField(
                 value = title,
-                onValueChange = { title = it },
+                onValueChange = { title = it; titleError = null },
                 label = { Text("Title") },
                 singleLine = true,
+                isError = titleError != null,
+                supportingText = titleError?.let { message -> { Text(message) } },
                 modifier = Modifier.fillMaxWidth(),
             )
 
@@ -148,6 +152,10 @@ fun ImageDetailScreen(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !isSaving,
                 onClick = {
+                    if (requireTitle && title.isBlank()) {
+                        titleError = "Title is required."
+                        return@Button
+                    }
                     saveError = null
                     viewModel.updateImageDetails(imageId, title, description) { success ->
                         if (success) onDone() else saveError = "Couldn't save — please try again."

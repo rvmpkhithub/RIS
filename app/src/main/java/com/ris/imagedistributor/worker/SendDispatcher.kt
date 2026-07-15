@@ -15,6 +15,7 @@ import com.ris.imagedistributor.domain.AppResult
 import com.ris.imagedistributor.domain.ComplianceGate
 import com.ris.imagedistributor.domain.GateResult
 import com.ris.imagedistributor.domain.ImageSelectionEngine
+import com.ris.imagedistributor.domain.SelectionUnit
 import java.time.Instant
 import java.time.ZoneId
 
@@ -103,6 +104,16 @@ class SendDispatcher(
         }
     }
 
+    /**
+     * Two-pass by design (operator-requested redesign, 2026-07-14): pass 1 collects every due,
+     * not-yet-dispatched (receiver, scheduleTime) slot across *all* receivers first, without
+     * sending anything yet; pass 2 hands the whole tick's slots to
+     * [ImageSelectionEngine.selectImagesForUnits] in one call, so it can coordinate counts across
+     * receivers (the combined total should match the active image count) instead of each receiver
+     * being decided in isolation. Pass 3 sends whatever each slot was allocated — now potentially
+     * more than one image per slot, restoring the pre-Story-2.4 "one Transmission row + one
+     * delivery attempt per image" shape.
+     */
     private suspend fun dispatchDueSlots(
         receivers: List<ReceiverWithSchedules>,
         nowInstant: Instant,
@@ -113,6 +124,7 @@ class SendDispatcher(
         val zonedNow = nowInstant.atZone(zone)
         val nowMinutesOfDay = zonedNow.hour * 60 + zonedNow.minute
 
+        val dueUnits = mutableListOf<SelectionUnit>()
         for (receiverWithSchedules in receivers) {
             val receiver = receiverWithSchedules.receiver
             // A receiver with any schedule of its own never consults the master schedule at
@@ -127,22 +139,25 @@ class SendDispatcher(
                     is AppResult.Success -> result.value
                     is AppResult.Failure -> continue
                 }
-                if (alreadyDispatched) continue
+                if (!alreadyDispatched) dueUnits.add(SelectionUnit(receiver, scheduleTime))
+            }
+        }
+        if (dueUnits.isEmpty()) return
 
-                val image = when (
-                    val result = imageSelectionEngine.selectImageFor(receiver.id)
-                ) {
-                    is AppResult.Success -> result.value ?: continue // no active images — nothing due to send this slot
-                    is AppResult.Failure -> continue
-                }
+        val allocation = when (val result = imageSelectionEngine.selectImagesForUnits(dueUnits)) {
+            is AppResult.Success -> result.value
+            is AppResult.Failure -> return
+        }
 
+        for (unit in dueUnits) {
+            for (image in allocation[unit].orEmpty()) {
                 val enqueued = when (
-                    val result = transmissionRepository.enqueue(receiver.id, image.id, scheduleTime, nowInstant)
+                    val result = transmissionRepository.enqueue(unit.receiver.id, image.id, unit.scheduleTime, nowInstant)
                 ) {
                     is AppResult.Success -> result.value
                     is AppResult.Failure -> continue
                 }
-                attemptDelivery(receiver, image, enqueued)
+                attemptDelivery(unit.receiver, image, enqueued)
             }
         }
     }

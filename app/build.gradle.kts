@@ -1,9 +1,25 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.kotlin.serialization)
 }
+
+// Secrets live in local.properties (gitignored, machine-specific — same file Android already uses
+// for sdk.dir) rather than in tracked source, so a real SMTP credential never has to touch git
+// history. See local.properties.example for the keys this project expects and when to set them.
+// Missing keys fall back to the same "TODO-operator-supplied" placeholder AppConfig.kt used to
+// hardcode — syntactically valid, fails at runtime (a bad SMTP login) rather than at build time,
+// consistent with this project's existing placeholder convention for not-yet-provisioned secrets.
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) FileInputStream(file).use { load(it) }
+}
+fun localProperty(key: String, default: String = "TODO-operator-supplied"): String =
+    (localProperties.getProperty(key) ?: System.getenv(key) ?: default)
 
 android {
     namespace = "com.ris.imagedistributor"
@@ -17,6 +33,9 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "SMTP_USERNAME", "\"${localProperty("SMTP_USERNAME")}\"")
+        buildConfigField("String", "SMTP_APP_PASSWORD", "\"${localProperty("SMTP_APP_PASSWORD")}\"")
     }
 
     buildTypes {
@@ -33,6 +52,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     testOptions {
@@ -85,6 +105,7 @@ dependencies {
     implementation(libs.work.runtime.ktx)
     implementation(libs.android.mail)
     implementation(libs.android.mail.activation)
+    implementation(libs.exifinterface)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
