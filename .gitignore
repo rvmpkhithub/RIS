@@ -29,3 +29,6 @@ captures/
 /screen*.png
 /emulator*.log
 /prompt.txt
+
+# Runtime lock file for scheduled Claude Code tasks — machine/session-specific, not project content
+.claude/scheduled_tasks.lock
