@@ -10,6 +10,7 @@ import com.ris.imagedistributor.data.repository.DeliveryRepository
 import com.ris.imagedistributor.data.repository.ImageRepository
 import com.ris.imagedistributor.data.repository.MasterScheduleRepository
 import com.ris.imagedistributor.data.repository.ReceiverRepository
+import com.ris.imagedistributor.data.repository.SubmissionNotificationRepository
 import com.ris.imagedistributor.data.repository.TransmissionRepository
 import com.ris.imagedistributor.domain.AppResult
 import com.ris.imagedistributor.domain.ComplianceGate
@@ -41,6 +42,7 @@ class SendDispatcherTest {
     private lateinit var complianceRepository: ComplianceRepository
     private lateinit var complianceGate: ComplianceGate
     private lateinit var masterScheduleRepository: MasterScheduleRepository
+    private lateinit var submissionNotificationRepository: SubmissionNotificationRepository
 
     private val compliantState = ComplianceState(nickname = "Ris", city = "Pune", locked = true)
     private val receiver = Receiver(id = 1L, name = "Asha", channel = "WHATSAPP", phoneOrEmail = "+911234567890")
@@ -59,6 +61,7 @@ class SendDispatcherTest {
         complianceRepository = mockk()
         complianceGate = mockk()
         masterScheduleRepository = mockk()
+        submissionNotificationRepository = mockk()
 
         coEvery { complianceRepository.getState() } returns AppResult.Success(compliantState)
         coEvery { complianceGate.evaluate(any(), any()) } returns GateResult.Proceed
@@ -66,11 +69,13 @@ class SendDispatcherTest {
         // Every existing test uses receivers with their own non-empty schedule times, so this
         // default keeps them unaffected — only the new fallback-specific tests override it.
         coEvery { masterScheduleRepository.getScheduleTimes() } returns AppResult.Success(emptyList())
+        coEvery { submissionNotificationRepository.notify(any(), any(), any()) } returns AppResult.Success(Unit)
     }
 
     private fun dispatcher(now: () -> Instant = { fixedNow }) = SendDispatcher(
         receiverRepository, imageRepository, imageSelectionEngine, transmissionRepository,
-        deliveryRepository, complianceRepository, complianceGate, masterScheduleRepository, now,
+        deliveryRepository, complianceRepository, complianceGate, masterScheduleRepository,
+        submissionNotificationRepository, now,
     )
 
     /** Stubs `selectImagesForUnits` to hand back exactly [imagesByUnit], whatever the actual
@@ -416,5 +421,96 @@ class SendDispatcherTest {
         dispatcher().dispatchDueSends() // should not throw
 
         coVerify(exactly = 0) { transmissionRepository.enqueue(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `only the latest of several already-passed schedule times is dispatched, earlier ones are never queried`() = runTest {
+        // 8am, 9am, 10am all passed (now is 10:00am / 600 minutes) — only 600 (10am) should ever
+        // be looked up or dispatched; 480/540 must never reach hasDispatchedToday or enqueue.
+        val rws = ReceiverWithSchedules(receiver, listOf(480, 540, 600))
+        coEvery { receiverRepository.getAllWithSchedules() } returns AppResult.Success(listOf(rws))
+        coEvery { transmissionRepository.hasDispatchedToday(1L, 600, any()) } returns AppResult.Success(false)
+        stubAllocation(SelectionUnit(receiver, 600) to listOf(image))
+        val enqueued = Transmission(id = 1L, receiverId = 1L, imageId = 10L, status = "PENDING", attemptCount = 0, sentAt = null, createdAt = fixedNow.toEpochMilli(), scheduleTime = 600)
+        coEvery { transmissionRepository.enqueue(1L, 10L, 600, fixedNow) } returns AppResult.Success(enqueued)
+        coEvery { deliveryRepository.send(receiver, image) } returns AppResult.Success(Unit)
+        coEvery { transmissionRepository.update(any()) } returns AppResult.Success(Unit)
+
+        dispatcher().dispatchDueSends()
+
+        coVerify(exactly = 1) { transmissionRepository.enqueue(1L, 10L, 600, fixedNow) }
+        coVerify(exactly = 0) { transmissionRepository.hasDispatchedToday(1L, 480, any()) }
+        coVerify(exactly = 0) { transmissionRepository.hasDispatchedToday(1L, 540, any()) }
+        coVerify(exactly = 0) { transmissionRepository.enqueue(1L, any(), 480, any()) }
+        coVerify(exactly = 0) { transmissionRepository.enqueue(1L, any(), 540, any()) }
+    }
+
+    @Test
+    fun `the latest passed slot still dispatches normally when it is the only one due`() = runTest {
+        // Sanity check the latest-only change doesn't regress the ordinary single-slot-due case.
+        val rws = ReceiverWithSchedules(receiver, listOf(600))
+        coEvery { receiverRepository.getAllWithSchedules() } returns AppResult.Success(listOf(rws))
+        coEvery { transmissionRepository.hasDispatchedToday(1L, 600, any()) } returns AppResult.Success(false)
+        stubAllocation(SelectionUnit(receiver, 600) to listOf(image))
+        val enqueued = Transmission(id = 1L, receiverId = 1L, imageId = 10L, status = "PENDING", attemptCount = 0, sentAt = null, createdAt = fixedNow.toEpochMilli(), scheduleTime = 600)
+        coEvery { transmissionRepository.enqueue(1L, 10L, 600, fixedNow) } returns AppResult.Success(enqueued)
+        coEvery { deliveryRepository.send(receiver, image) } returns AppResult.Success(Unit)
+        coEvery { transmissionRepository.update(any()) } returns AppResult.Success(Unit)
+
+        dispatcher().dispatchDueSends()
+
+        coVerify(exactly = 1) { transmissionRepository.enqueue(1L, 10L, 600, fixedNow) }
+    }
+
+    @Test
+    fun `a successful send notifies the submission endpoint once with the unit's sent image count`() = runTest {
+        val rws = ReceiverWithSchedules(receiver, listOf(540))
+        coEvery { receiverRepository.getAllWithSchedules() } returns AppResult.Success(listOf(rws))
+        coEvery { transmissionRepository.hasDispatchedToday(1L, 540, any()) } returns AppResult.Success(false)
+        val imageTwo = Image(id = 11L, filePath = "b.jpg", active = true, uploadedAt = 0L)
+        stubAllocation(SelectionUnit(receiver, 540) to listOf(image, imageTwo))
+        val enqueuedOne = Transmission(id = 1L, receiverId = 1L, imageId = 10L, status = "PENDING", attemptCount = 0, sentAt = null, createdAt = fixedNow.toEpochMilli(), scheduleTime = 540)
+        val enqueuedTwo = Transmission(id = 2L, receiverId = 1L, imageId = 11L, status = "PENDING", attemptCount = 0, sentAt = null, createdAt = fixedNow.toEpochMilli(), scheduleTime = 540)
+        coEvery { transmissionRepository.enqueue(1L, 10L, 540, fixedNow) } returns AppResult.Success(enqueuedOne)
+        coEvery { transmissionRepository.enqueue(1L, 11L, 540, fixedNow) } returns AppResult.Success(enqueuedTwo)
+        coEvery { deliveryRepository.send(receiver, image) } returns AppResult.Success(Unit)
+        coEvery { deliveryRepository.send(receiver, imageTwo) } returns AppResult.Success(Unit)
+        coEvery { transmissionRepository.update(any()) } returns AppResult.Success(Unit)
+
+        dispatcher().dispatchDueSends()
+
+        coVerify(exactly = 1) { submissionNotificationRepository.notify("Ris", "Pune", 2) }
+    }
+
+    @Test
+    fun `a fully failed send never notifies the submission endpoint`() = runTest {
+        val rws = ReceiverWithSchedules(receiver, listOf(540))
+        coEvery { receiverRepository.getAllWithSchedules() } returns AppResult.Success(listOf(rws))
+        coEvery { transmissionRepository.hasDispatchedToday(1L, 540, any()) } returns AppResult.Success(false)
+        stubAllocation(SelectionUnit(receiver, 540) to listOf(image))
+        val enqueued = Transmission(id = 1L, receiverId = 1L, imageId = 10L, status = "PENDING", attemptCount = 0, sentAt = null, createdAt = fixedNow.toEpochMilli(), scheduleTime = 540)
+        coEvery { transmissionRepository.enqueue(any(), any(), any(), any()) } returns AppResult.Success(enqueued)
+        coEvery { deliveryRepository.send(any(), any()) } returns AppResult.Failure(FailureReason.UNKNOWN)
+        coEvery { transmissionRepository.update(any()) } returns AppResult.Success(Unit)
+
+        dispatcher().dispatchDueSends()
+
+        coVerify(exactly = 0) { submissionNotificationRepository.notify(any(), any(), any()) }
+    }
+
+    @Test
+    fun `retry-pass sends do not trigger a submission notification`() = runTest {
+        // Notification is scoped to the initial per-tick dispatch only — retries of a previously
+        // queued item aren't grouped by (receiver, scheduleTime) unit the way dispatchDueSlots is.
+        coEvery { receiverRepository.getAllWithSchedules() } returns AppResult.Success(listOf(ReceiverWithSchedules(receiver, emptyList())))
+        val pending = Transmission(id = 5L, receiverId = 1L, imageId = 10L, status = "PENDING", attemptCount = 1, sentAt = null, createdAt = fixedNow.toEpochMilli(), scheduleTime = 540)
+        coEvery { transmissionRepository.getRetryCandidates() } returns AppResult.Success(listOf(pending))
+        coEvery { imageRepository.getImageById(10L) } returns AppResult.Success(image)
+        coEvery { deliveryRepository.send(receiver, image) } returns AppResult.Success(Unit)
+        coEvery { transmissionRepository.update(any()) } returns AppResult.Success(Unit)
+
+        dispatcher().dispatchDueSends()
+
+        coVerify(exactly = 0) { submissionNotificationRepository.notify(any(), any(), any()) }
     }
 }

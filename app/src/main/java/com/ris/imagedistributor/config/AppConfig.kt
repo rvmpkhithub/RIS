@@ -16,6 +16,11 @@ object AppConfig {
     const val REGISTRATION_API_URL: String = "https://myspendingbook.com/api/public/customers/register/"
     const val COMPLIANCE_API_URL: String = "https://myspendingbook.com/api/public/customers/compliance/"
 
+    // Operator-supplied (2026-07-15) — trailing slash added per this file's own URL contract
+    // above; the operator's given URL (https://myspendingbook.com/SaveSubmissionData) didn't have
+    // one. POSTs {nickname, city, imagesSent} once per receiver per schedule occurrence.
+    const val SUBMISSION_NOTIFICATION_API_URL: String = "https://myspendingbook.com/SaveSubmissionData/"
+
     // TODO: operator-supplied — the WhatsApp Business Cloud API account/template are still being
     // provisioned as of SPEC.md's authoring. Replace before shipping. Must end in "/".
     const val WHATSAPP_API_URL: String = "https://TODO-operator-supplied.example.com/"

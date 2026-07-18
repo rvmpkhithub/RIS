@@ -8,6 +8,7 @@ import com.ris.imagedistributor.data.local.ImageFileStore
 import com.ris.imagedistributor.data.remote.ComplianceApi
 import com.ris.imagedistributor.data.remote.RegistrationApi
 import com.ris.imagedistributor.data.remote.SmtpClient
+import com.ris.imagedistributor.data.remote.SubmissionNotificationApi
 import com.ris.imagedistributor.data.remote.WhatsAppApi
 import com.ris.imagedistributor.data.repository.ComplianceRepository
 import com.ris.imagedistributor.data.repository.ComplianceRepositoryImpl
@@ -21,6 +22,8 @@ import com.ris.imagedistributor.data.repository.ReceiverRepository
 import com.ris.imagedistributor.data.repository.ReceiverRepositoryImpl
 import com.ris.imagedistributor.data.repository.RetentionRepository
 import com.ris.imagedistributor.data.repository.RetentionRepositoryImpl
+import com.ris.imagedistributor.data.repository.SubmissionNotificationRepository
+import com.ris.imagedistributor.data.repository.SubmissionNotificationRepositoryImpl
 import com.ris.imagedistributor.data.repository.TransmissionRepository
 import com.ris.imagedistributor.data.repository.TransmissionRepositoryImpl
 import com.ris.imagedistributor.domain.ComplianceGate
@@ -139,6 +142,14 @@ class AppContainer(context: Context) {
         DeliveryRepositoryImpl(whatsAppApi = whatsAppApi, smtpClient = smtpClient, imageFileStore = imageFileStore)
     }
 
+    private val submissionNotificationApi: SubmissionNotificationApi by lazy {
+        buildRetrofit(AppConfig.SUBMISSION_NOTIFICATION_API_URL).create(SubmissionNotificationApi::class.java)
+    }
+
+    val submissionNotificationRepository: SubmissionNotificationRepository by lazy {
+        SubmissionNotificationRepositoryImpl(api = submissionNotificationApi)
+    }
+
     val sendDispatcher: SendDispatcher by lazy {
         SendDispatcher(
             receiverRepository = receiverRepository,
@@ -149,6 +160,7 @@ class AppContainer(context: Context) {
             complianceRepository = complianceRepository,
             complianceGate = complianceGate,
             masterScheduleRepository = masterScheduleRepository,
+            submissionNotificationRepository = submissionNotificationRepository,
         )
     }
 

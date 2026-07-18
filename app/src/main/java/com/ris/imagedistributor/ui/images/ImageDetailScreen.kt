@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -42,6 +43,8 @@ import com.ris.imagedistributor.data.local.Image
  * reading as a form). Deliberately no gold-bordered card around the fields either — "this screen
  * exists to look at the photo, not to feel like a form."
  */
+private val IMAGE_PREVIEW_MAX_HEIGHT = 320.dp
+
 @Composable
 fun ImageDetailScreen(
     viewModel: ImageLibraryViewModel,
@@ -77,15 +80,15 @@ fun ImageDetailScreen(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
-            // ContentScale.FillWidth (not Fit + a fixed height) is what actually makes this
-            // edge-to-edge for a real portrait phone photo — Fit inside a fixed-height box
-            // letterboxes a tall image down to a narrow strip with empty space on both sides,
-            // which is not full-bleed no matter how wide the containing Box is.
+            // Capped height (Crop, not FillWidth-with-unbounded-height) — a tall portrait photo
+            // at FillWidth could render taller than the viewport, burying title/description/Save
+            // below a huge scroll. This keeps the preview a fixed-height banner so the fields
+            // below are reachable with little to no scrolling regardless of the photo's aspect ratio.
             AsyncImage(
                 model = viewModel.resolveFile(existing),
                 contentDescription = null,
-                contentScale = ContentScale.FillWidth,
-                modifier = Modifier.fillMaxWidth(),
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxWidth().heightIn(max = IMAGE_PREVIEW_MAX_HEIGHT),
             )
             TextButton(
                 onClick = onDone,
